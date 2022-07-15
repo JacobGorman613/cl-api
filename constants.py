@@ -1,0 +1,9 @@
+ELL_GAMMA = 1024
+ELL_N = 2048
+ELL_DELTA = 100
+ELL_LAMBDA = 100
+ELL_K = 100
+EPSILON = 2
+
+concat(*argv):
+	#TODO
