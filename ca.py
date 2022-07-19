@@ -1,7 +1,7 @@
 import hashlib
 import constants
 
-reparam_verify_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, n, p_d, zkp_vc1):
+def reparam_verify_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, n, p_d, zkp_vc1):
     c = zkp_ng2['c']
     
     t = zkp_ng2['t']
@@ -52,7 +52,7 @@ reparam_verify_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h
 
     return True
 
-verify_zkp_vf_cred_1(w, A, m, zkp_vc1, pk_idp, pk_da):
+def verify_zkp_vf_cred_1(w, A, m, zkp_vc1, pk_idp, pk_da):
     n = pk_idp['n']
     a = pk_idp['a']
     b = pk_idp['b']
@@ -95,4 +95,4 @@ verify_zkp_vf_cred_1(w, A, m, zkp_vc1, pk_idp, pk_da):
     h_2 = h_d
     h_3 = (y_1 * (y_2 ** H))
 
-	return reparam_verify_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, n, p_d, zkp_vc1)
+    return reparam_verify_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, n, p_d, zkp_vc1)

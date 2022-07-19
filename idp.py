@@ -4,7 +4,7 @@ import hashlib
 
 #nym_gen
 
-nym_gen_2():
+def nym_gen_2():
     r = secrets.randbits(ELL_DELTA + 1)
     N_2 = secrets.randbits(ELL_K)
 
@@ -14,7 +14,7 @@ nym_gen_2():
     }
     return ng2_dict
 
-reparam_verify_zkp_cred_gen_1(y_1, y_2, g_1, g_2, n, zkp_ng1):
+def reparam_verify_zkp_nym_gen_1(y_1, y_2, g_1, g_2, n, zkp_ng1):
     c = zkp_ng1['c']
     
     t = zkp_ng1['t']
@@ -28,40 +28,47 @@ reparam_verify_zkp_cred_gen_1(y_1, y_2, g_1, g_2, n, zkp_ng1):
     s_4 = s['s_4']
 
 
+    string = constants.concat(g_1, g_2, y_1, y_2, t_1, t_2)
+    h = hashlib.sha256()
+    h.update(string.encode())
+    H = h.digest()
+
     #do cheapest check first, hash < big exponentiations (I think)
 
-    h = hashlib.sha256()
-    h.update(concat(g_1, g_2, y_1, y_2, t_1, t_2))
-    H = h.digest()
-    if (H != c):
+    c2 = 0
+    for byte in H:
+        c2 *= 256
+        c2 += int(byte)
+    
+    if (c2 != c):
         return False
 
-    T_1 = ((g_1 ** s_1) * (g_2 ** s_2) * (y_1 ** c)) % n
+    T_1 = (pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(y_1, c, n)) % n
     if (T_1 != t_1):
         return False
 
-    T_2 = ((g_1 ** s_3) * (g_2 ** s_4) * (y_2 ** c)) % n
+    T_2 = (pow(g_1, s_3, n) * pow(g_2, s_4, n) * pow(y_2, c, n)) % n
     if (T_2 != t_2):
         return False
 
     return True
 
-verify_zkp_cred_gen_1(C_1, C_2, pk_idp, zkp_ng1):
+def verify_zkp_nym_gen_1(C_1, C_2, pk_idp, zkp_ng1):
     n = pk_idp['n']
     
     g = pk_idp['g']
     h = pk_idp['h']
     
-    y_1 = (C_1 ** 2) % n
-    y_2 = (C_1 ** 2) & n
+    y_1 = pow(C_1, 2, n)
+    y_2 = pow(C_2, 2, n)
     
-    g_1 = (g ** 2) % n
-    g_2 = (h ** 2) % n
+    g_1 = pow(g, 2, n)
+    g_2 = pow(h, 2, n)
 
-    return reparam_verify_zkp_cred_gen_1(y_1, y_2, g_1, g_2, n, zkp_ng1)
+    return reparam_verify_zkp_nym_gen_1(y_1, y_2, g_1, g_2, n, zkp_ng1)
 
 
-reparam_verify_zkp_cred_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, n, zkp_ng2):
+def reparam_verify_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, n, zkp_ng2):
     c = zkp_ng2['c']
     
     t = zkp_ng2['t']
@@ -110,7 +117,7 @@ reparam_verify_zkp_cred_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, 
 
     return True
 
-verify_zkp_nym_gen_2(C_1, C_2, C_3, r, P_u, pk_idp, zkp_ng2):
+def verify_zkp_nym_gen_2(C_1, C_2, C_3, r, P_u, pk_idp, zkp_ng2):
     n = pk_idp['n']
     
     h = pk_idp['h']
@@ -132,7 +139,7 @@ verify_zkp_nym_gen_2(C_1, C_2, C_3, r, P_u, pk_idp, zkp_ng2):
 
     return reparam_verify_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, n, zkp_ng2)
 
-reparam_verify_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, n, p_d, zkp_ng3):
+def reparam_verify_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, n, p_d, zkp_ng3):
 
     c = zkp_ng3['c']
     
@@ -161,7 +168,7 @@ reparam_verify_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, n, p_d, zkp_ng3):
 
     return True
 
-verify_zkp_nym_gen_3(P_u, Y_u, pk_idp, pk_da, zkp_ng3):
+def verify_zkp_nym_gen_3(P_u, Y_u, pk_idp, pk_da, zkp_ng3):
     n = pk_idp['n']
     a = pk_idp['a']
     b = pk_idp['b']
@@ -183,7 +190,7 @@ verify_zkp_nym_gen_3(P_u, Y_u, pk_idp, pk_da, zkp_ng3):
 
 #cred_gen
 
-reparam_verify_zkp_cred_gen_1(y_1, g_1, g_2, g_3, n):
+def reparam_verify_zkp_cred_gen_1(y_1, g_1, g_2, g_3, n):
     c = zkp_cg1['c']
     
     t = zkp_cg1['t']
@@ -206,7 +213,7 @@ reparam_verify_zkp_cred_gen_1(y_1, g_1, g_2, g_3, n):
 
     return True
 
-verify_zkp_cred_gen_1(P_u, pk_idp, zkp_cg1):
+def verify_zkp_cred_gen_1(P_u, pk_idp, zkp_cg1):
     n = pk_idp['n']
     a = pk_idp['a']
     b = pk_idp['b']
@@ -220,7 +227,7 @@ verify_zkp_cred_gen_1(P_u, pk_idp, zkp_cg1):
 
     return reparam_verify_zkp_cred_gen_1(y_1, g_1, g_2, g_3, n, zkp_cg1)
 
-cred_gen_1(P_u, pk_idp):
+def cred_gen_1(P_u, pk_idp):
     d = pk_idp['d']
     n = pk_idp['n']
 

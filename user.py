@@ -1,21 +1,22 @@
 import math
 import secrets
 import hashlib
+import constants
 
 #nym_gen
 
-nym_gen_1(x_u, pk_idp):    
+def nym_gen_1(x_u, pk_idp):    
     g = pk_idp['g']
     h = pk_idp['h']
     n = pk_idp['n']
 
-    N_1 = secrets.randbits(ELL_K)
-    r_1 = secrets.randbits(ELL_DELTA + 1)
-    r_2 = secrets.randbits(2 * ELL_N)
-    r_3 = secrets.randbits(2 * ELL_N)
+    N_1 = secrets.randbits(constants.ELL_K)
+    r_1 = secrets.randbits(constants.ELL_DELTA + 1)
+    r_2 = secrets.randbits(2 * constants.ELL_N)
+    r_3 = secrets.randbits(2 * constants.ELL_N)
 
-    C_1 = ((g ** r_1) * (h ** r_2)) % n
-    C_2 = ((g ** x_u) * (h ** r_3)) % n
+    C_1 = (pow(g, r_1, n) * pow(h, r_2, n)) % n
+    C_2 = (pow(g, x_u, n) * pow(h, r_3, n)) % n
 
     out_dict = {
         'N_1':N_1,
@@ -29,7 +30,7 @@ nym_gen_1(x_u, pk_idp):
     return out_dict
 
 # $$ PK\{(a_1, a_2, a_3, a_4): y_1 = g_1^{a_1}g_2^{a_2} \land g_2=g_1^{a_3}g_2^{a_4}\} $$
-reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, a_1, a_2, a_3, a_4, n):
+def reparam_zkp_nym_gen_1(y_1, y_2, g_1, g_2, a_1, a_2, a_3, a_4, n):
     r_1 = secrets.randbelow(n)
     r_2 = secrets.randbelow(n)
     r_3 = secrets.randbelow(n)
@@ -37,12 +38,19 @@ reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, a_1, a_2, a_3, a_4, n):
 
     #Ord(QRn) == p'q', so order of each element guaranteed to be big
 
-    t_1 = ((g_1 ** r_1) * (g_2 ** r_2)) % n
-    t_2 = ((g_1 ** r_3) * (g_2 ** r_4)) % n
+    t_1 = (pow(g_1, r_1, n) * pow(g_2, r_2, n)) % n
+    t_2 = (pow(g_1, r_3, n) * pow(g_2, r_4, n)) % n
+
+    string = constants.concat(g_1, g_2, y_1, y_2, t_1, t_2)
 
     h = hashlib.sha256()
-    h.update(concat(g_1, g_2, y_1, y_2, t_1, t_2))
-    c = h.digest()
+    h.update(string.encode())
+    H = h.digest()
+
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
 
     s_1 = r_1 - c * a_1 # might need a modulus but idts
     s_2 = r_2 - c * a_2 # might need a modulus but idts
@@ -68,36 +76,36 @@ reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, a_1, a_2, a_3, a_4, n):
 
     return zkp
 
-zkp_nym_gen_1(C_1, C_2, r_1, r_2, r_3, x_u, pk_idp):
+def zkp_nym_gen_1(C_1, C_2, r_1, r_2, r_3, x_u, pk_idp):
     n = pk_idp['n']
     g = pk_idp['g']
     h = pk_idp['h']
     
-    y_1 = (C_1 ** 2) % n
-    y_2 = (C_1 ** 2) & n
+    y_1 = pow(C_1, 2, n)
+    y_2 = pow(C_2, 2, n)
     
-    g_1 = (g ** 2) % n
-    g_2 = (h ** 2) % n
+    g_1 = pow(g, 2, n)
+    g_2 = pow(h, 2, n)
     
     a_1 = r_1
     a_2 = r_2
     a_3 = x_u
     a_4 = r_3
     
-    return reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, a_1, a_2, a_3, a_4, n)
+    return reparam_zkp_nym_gen_1(y_1, y_2, g_1, g_2, a_1, a_2, a_3, a_4, n)
     
-nym_gen_3(r_1, r, x_u, pk_idp):
+def nym_gen_3(r_1, r, x_u, pk_idp):
     a = pk_idp['a']
     b = pk_idp['b']
     v = pk_idp['v']
     n = pk_idp['n']
 
-    x_u_o = secrets.randbits(ELL_GAMMA + 1)
-    r_4 = secrets.randbits(ELL_N)
+    x_u_o = secrets.randbits(constants.ELL_GAMMA + 1)
+    r_4 = secrets.randbits(constants.ELL_N)
     
-    s_u = (((r_1 + r) % (2 << (ELL_DELTA + 1)) - 1)) - (2 << ELL_DELTA) + 1
+    s_u = (((r_1 + r) % (2 << (constants.ELL_DELTA + 1)) - 1)) - (2 << constants.ELL_DELTA) + 1
     P_u = (a ** x_u) * (b ** s_u) #mod n
-    s_tilde = math.floor((r_1 + r) / ((2 << (ELL_DELTA + 1)) - 1))
+    s_tilde = math.floor((r_1 + r) / ((2 << (constants.ELL_DELTA + 1)) - 1))
     C_3 = ((g ** s_tilde) * (h ** r_4)) % n
 
     out_dict = {
@@ -112,7 +120,7 @@ nym_gen_3(r_1, r, x_u, pk_idp):
     return out_dict
 
 # $$ PK\{ TODO \} $$
-reparam_zkp_cred_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1, a_2, a_3, a_4, a_5, a_6, a_7, a_8, a_9, n):
+def reparam_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1, a_2, a_3, a_4, a_5, a_6, a_7, a_8, a_9, n):
     r_1 = secrets.randbelow(n)
     r_2 = secrets.randbelow(n)
     r_3 = secrets.randbelow(n)
@@ -133,7 +141,12 @@ reparam_zkp_cred_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1, a_
 
     h = hashlib.sha256()
     h.update(concat(g_1, g_2, g_3, g_4, g_5, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5))
-    c = h.digest()
+    H = h.digest()
+
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
 
     s_1 = r_1 - c * a_1 # might need a modulus but idts
     s_2 = r_2 - c * a_2 # might need a modulus but idts
@@ -149,7 +162,7 @@ reparam_zkp_cred_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1, a_
         's_1': s_1, 
         's_2': s_2, 
         's_3': s_3, 
-        's_4': s_4
+        's_4': s_4,
         's_5': s_5, 
         's_6': s_6, 
         's_7': s_7, 
@@ -172,7 +185,7 @@ reparam_zkp_cred_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1, a_
 
     return zkp
 
-zkp_nym_gen_2(C_1, C_2, C_3, R, P_u, x_u, x_u_o, s_u, s_tilde, pk_idp):
+def zkp_nym_gen_2(C_1, C_2, C_3, R, P_u, x_u, x_u_o, s_u, s_tilde, pk_idp):
     r = R['r']
     r_1 = R['r_1']
     r_2 = R['r_2']
@@ -195,7 +208,7 @@ zkp_nym_gen_2(C_1, C_2, C_3, R, P_u, x_u, x_u_o, s_u, s_tilde, pk_idp):
     y_1 = (C_1 ** 2) % n
     y_2 = (C_2 ** 2) % n
     y_3 = (C_3 ** 2) % n
-    y_4 = (y_1 * (g_1 ** (r - (2 << ELL_DELTA) + 1))) / (y_3 ** ((2 << (ELL_DELTA + 1)) - 1))
+    y_4 = (y_1 * (g_1 ** (r - (2 << constants.ELL_DELTA) + 1))) / (y_3 ** ((2 << (constants.ELL_DELTA + 1)) - 1))
     y_5 = (P_u ** 2) % n
         
     a_1 = r_1
@@ -205,12 +218,12 @@ zkp_nym_gen_2(C_1, C_2, C_3, R, P_u, x_u, x_u_o, s_u, s_tilde, pk_idp):
     a_5 = s_tilde
     a_6 = r_4
     a_7 = s_u
-    a_8 = r_2 - r_4 * ((2 << (ELL_DELTA + 1)) - 1)
+    a_8 = r_2 - r_4 * ((2 << (constants.ELL_DELTA + 1)) - 1)
     a_9 = x_u_o
 
-    return reparam_zkp_cred_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1, a_2, a_3, a_4, a_5, a_6, a_7, a_8, a_9, n):
+    return reparam_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1, a_2, a_3, a_4, a_5, a_6, a_7, a_8, a_9, n)
 
-nym_gen_4(x_u, pk_da):
+def nym_gen_4(x_u, pk_da):
     #ng4_dict = json.loads(json_string)
     #x_u = ng4_dict['x_u']
     #pk_da = ng4_dict['pk_da']
@@ -221,8 +234,8 @@ nym_gen_4(x_u, pk_da):
 
     return Y_u
 
-# $$ PK\{ (a_1, a_2, a_3) : y_1 = g_1^{a_1}g_2^{a_2}g_3^{a_3} \land y_2 = h ^ a_1 \land -2^{ELL\_DELTA} < a_3 < -2^{ELL\_DELTA} \} $$
-reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, a_1, a_2, a_3, n, p_d):
+# $$ PK\{ (a_1, a_2, a_3) : y_1 = g_1^{a_1}g_2^{a_2}g_3^{a_3} \land y_2 = h ^ a_1 \land -2^{constants.ELL\_DELTA} < a_3 < -2^{constants.ELL\_DELTA} \} $$
+def reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, a_1, a_2, a_3, n, p_d):
     r_1 = secrets.randbelow(n)
     r_2 = secrets.randbelow(n)
     r_3 = secrets.randbelow(n)
@@ -235,7 +248,12 @@ reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, a_1, a_2, a_3, n, p_d):
 
     h = hashlib.sha256()
     h.update(concat(g_1, g_2, g_3, h, y_1, y_2, t_1, t_2))
-    c = h.digest()
+    H = h.digest()
+
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
 
     s_1 = r_1 - c * a_1 # might need a modulus but idts
     s_2 = r_2 - c * a_2 # might need a modulus but idts
@@ -259,7 +277,7 @@ reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, a_1, a_2, a_3, n, p_d):
 
     return zkp
 
-zkp_nym_gen_3(P_u, Y_u, x_u, x_u_o, s_u, pk_idp, pk_da):
+def zkp_nym_gen_3(P_u, Y_u, x_u, x_u_o, s_u, pk_idp, pk_da):
     n = pk_idp['n']
     a = pk_idp['a']
     b = pk_idp['b']
@@ -281,12 +299,12 @@ zkp_nym_gen_3(P_u, Y_u, x_u, x_u_o, s_u, pk_idp, pk_da):
     a_2 = s_u
     a_3 = x_u_o
 
-    return reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, a_1, a_2, a_3, n, p_d):
+    return reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, a_1, a_2, a_3, n, p_d)
 
 #cred_gen
 
-# $$ PK\{ (a_1, a_2, a_3) : y_1 = g_1^{a_1}g_2^{a_2}g_3^{a_3} \land -2^{ELL\_DELTA} < a_3 < -2^{ELL\_DELTA} \} $$
-reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, g_3, a_1, a_2, a_3, n):
+# $$ PK\{ (a_1, a_2, a_3) : y_1 = g_1^{a_1}g_2^{a_2}g_3^{a_3} \land -2^{constants.ELL\_DELTA} < a_3 < -2^{constants.ELL\_DELTA} \} $$
+def reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, g_3, a_1, a_2, a_3, n):
     r_1 = secrets.randbelow(n)
     r_2 = secrets.randbelow(n)
     r_3 = secrets.randbelow(n)
@@ -297,7 +315,12 @@ reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, g_3, a_1, a_2, a_3, n):
 
     h = hashlib.sha256()
     h.update(concat(g_1, g_2, g_3, y_1, t_1))
-    c = h.digest()
+    H = h.digest()
+
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
 
     s_1 = r_1 - c * a_1 # might need a modulus but idts
     s_2 = r_2 - c * a_2 # might need a modulus but idts
@@ -313,14 +336,14 @@ reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, g_3, a_1, a_2, a_3, n):
     }
 
     zkp = {
-        'c': c
-        's': s
+        'c': c,
+        's': s,
         't': t
     }
 
     return zkp
 
-zkp_cred_gen_1(P_u, x_u, x_u_o, s_u, pk_idp):
+def zkp_cred_gen_1(P_u, x_u, x_u_o, s_u, pk_idp):
     n = pk_idp['n']
     a = pk_idp['a']
     b = pk_idp['b']
@@ -336,9 +359,9 @@ zkp_cred_gen_1(P_u, x_u, x_u_o, s_u, pk_idp):
     a_2 = s_u
     a_3 = x_u_o
 
-    return reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, g_3, a_1, a_2, a_3, n),
+    return reparam_zkp_nym_gen_1(y_1, y_2, g_1, g_2, g_3, a_1, a_2, a_3, n),
 
-cred_gen_2(e_u, c_u, P_u, pk_idp):
+def cred_gen_2(e_u, c_u, P_u, pk_idp):
     d = pk_idp['d']
     n = pk_idp['n']
 
@@ -349,7 +372,7 @@ cred_gen_2(e_u, c_u, P_u, pk_idp):
 
 #verify_cred
 
-verify_cred_1(c_u, Y_u, m, pk_idp, pk_da):
+def verify_cred_1(c_u, Y_u, m, pk_idp, pk_da):
     h = pk_idp['h']
     n = pk_idp['n']
 
@@ -360,7 +383,7 @@ verify_cred_1(c_u, Y_u, m, pk_idp, pk_da):
     y_2 = pk_da['y_2']
     y_3 = pk_da['y_3']
 
-    r_1 = secrets.randbits(2 * ELL_N)
+    r_1 = secrets.randbits(2 * constants.ELL_N)
     r_2 = secrets.randbelow(n)
 
 
@@ -391,7 +414,7 @@ verify_cred_1(c_u, Y_u, m, pk_idp, pk_da):
 
 # $$ PK\{ (a_1, a_2, a_3, a_4, a_5, a_6) : y_1 = g_1^{a_1}g_2^{a_2}g_3^{a_3}g_4^{a_4}g_5^{a_5} 
 #       \land y_2 = h_1^{a_6} \land y_3 = h_2^{a_6} \land y_4 = h_1^{a_2}h_2^{a_6} \land y_5=h_3^{a_6}\} $$
-reparam_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, a_1, a_2, a_3, a_4, a_5, a_6, n, p_d):
+def reparam_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, a_1, a_2, a_3, a_4, a_5, a_6, n, p_d):
     r_1 = secrets.randbelow(n)
     r_2 = secrets.randbelow(n)
     r_3 = secrets.randbelow(n)
@@ -409,7 +432,12 @@ reparam_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2
 
     h = hashlib.sha256()
     h.update(concat(g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5))
-    c = h.digest()
+    H = h.digest()
+
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
 
     s_1 = r_1 - c * a_1 # might need a modulus but idts
     s_2 = r_2 - c * a_2 # might need a modulus but idts
@@ -442,7 +470,7 @@ reparam_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2
 
     return zkp
 
-zkp_vf_cred_1(w, A, m, r_1, r_2, e_u, x_u, x_u_o, s_u, pk_idp, pk_da):
+def zkp_vf_cred_1(w, A, m, r_1, r_2, e_u, x_u, x_u_o, s_u, pk_idp, pk_da):
     n = pk_idp['n']
     a = pk_idp['a']
     b = pk_idp['b']
