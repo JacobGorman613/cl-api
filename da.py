@@ -14,19 +14,25 @@ def deanon_1(w, m, pk_da, sk_da):
     w_3 = w['w_3']
     w_4 = w['w_4']
 
-    h = hashlib.sha256()
-    h.update(concat(w_1, w_2, w_3, m))
-    H = h.digest()
+    string = constants.concat(w_1, w_2, w_3, m)
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
 
-    rhs = (w_1 ** (x_1 + x_3 * H)) * (w_2 ** (x_2 + x_4 * H)) % p_d
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
 
-    return (w_4 == rhs)
+    rhs = (pow(w_1, (x_1 + x_3 * c), p_d) * pow(w_2, (x_2 + x_4 * c), p_d)) % p_d
+
+    return w_4 == rhs
 
 def deanon_2(w_1, w_3, pk_da, sk_da):
     x_5 = sk_da['x_5']
 
     p_d = pk_da['p_d']
     
-    y_hat = w_3 * pow(w_1, -1 * x_5, p_d)
+    y_hat = w_3 * pow(w_1, -x_5, p_d) % p_d
 
     return y_hat

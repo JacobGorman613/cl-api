@@ -84,8 +84,6 @@ def user_demo(queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user):
 
     #STORE x_u_o, s_u, nym, Y_u, P_u
 
-    #TODO: WHY DOES THIS RETURN AS A LIST?
-    #[0] is a fix because for some reason cred_gen_msg_1 returns a tuple with the dict we want instead of just the dict
     zkp_cg1 = user.zkp_cred_gen_1(P_u, x_u, x_u_o, s_u, pk_idp)
 
     cred_gen_msg_1 = {
@@ -143,7 +141,7 @@ def user_demo(queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user):
 
     #get certificate or false
 
-def idp_demo(queue_user_idp, queue_idp_user):
+def idp_demo(queue_user_idp, queue_idp_user, queue_le_idp, queue_idp_le):
     #initialize and sk/pk, publish pk
     (pk_idp, sk_idp) = constants.init_idp_key()
     constants.publish_pk_idp(pk_idp)
@@ -215,7 +213,18 @@ def idp_demo(queue_user_idp, queue_idp_user):
 
     #store e_u and c_u with P_u and nym_u
 
-def ca_demo(queue_user_ca, queue_ca_user):
+    #wait until law enforcement comes to us
+    while queue_le_idp.empty():
+        continue
+
+    deanon_msg_2 = json.loads(queue_le_idp.get())
+    y_hat = deanon_msg_2['y_hat']
+
+    if y_hat == Y_u:
+        print("MATCH, FOUND USER")
+    else:
+        print("NO MATCH, SOMETHINGS WRONG")
+def ca_demo(queue_user_ca, queue_ca_user, queue_ca_le):
     pk_idp = constants.import_pk_idp()
     pk_da = constants.import_pk_da()
 
@@ -232,12 +241,59 @@ def ca_demo(queue_user_ca, queue_ca_user):
     vf_vc1 = ca.verify_zkp_vf_cred_1(w, A, m, zkp_vc1, pk_idp, pk_da)
     print("vf_vc1 =", vf_vc1)
 
+    #store w and m in case necessary
     #send certificate
+
+    #here we would wait for law enforcement to send a certificate then check our database for corresponding w and m
+    deanon_msg_1 = {
+        'w': w,
+        'm':m
+    }
+
+    queue_ca_le.put(json.dumps(deanon_msg_1))
+
+def le_demo(queue_ca_le, queue_le_idp, queue_idp_le, queue_le_da, queue_da_le):
+    while queue_ca_le.empty():
+        continue
     
-def da_demo():
+    deanon_msg_1 = json.loads(queue_ca_le.get())
+    #i guess there's no real reason to un-json/re-json the string    
+    queue_le_da.put(json.dumps(deanon_msg_1))
+
+    while queue_da_le.empty():
+        continue
+
+    deanon_msg_2 = json.loads(queue_da_le.get())
+    #i guess there's no real reason to un-json/re-json the string
+    queue_le_idp.put(json.dumps(deanon_msg_2))
+    
+def da_demo(queue_le_da, queue_da_le):
     #initialize and publish keys
     (pk_da, sk_da) = constants.init_da_key()
     constants.publish_pk_da(pk_da)
+
+    while(queue_le_da.empty()):
+        continue
+
+    deanon_msg_1 = json.loads(queue_le_da.get())
+
+    w = deanon_msg_1['w']
+    m = deanon_msg_1['m']
+
+    is_valid = da.deanon_1(w, m, pk_da, sk_da)
+
+    print("is_valid =", is_valid)
+
+    w_1 = w['w_1']
+    w_3 = w['w_3']
+
+    y_hat = da.deanon_2(w_1, w_3, pk_da, sk_da)
+
+    deanon_msg_2 = {
+        'y_hat': y_hat
+    }
+
+    queue_da_le.put(json.dumps(deanon_msg_2))
 
 def main():
     #if we dont clear the keys then user/ca read old keys and everything breaks
@@ -245,19 +301,29 @@ def main():
 
     queue_user_idp = Queue() #for user to send stuff to idp
     queue_idp_user = Queue() #for idp to send stuff to user
+    
     queue_user_ca = Queue()  #for user to send stuff to ca
     queue_ca_user = Queue()  #for ca to send stuff to user
-    #queue_da = Queue()
+    
+    queue_ca_le = Queue()
+
+    queue_le_idp = Queue()
+    queue_idp_le = Queue()
+
+    queue_le_da = Queue()
+    queue_da_le = Queue()
 
     user_thread = Thread(target = user_demo, args = (queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user, ))
-    idp_thread = Thread(target = idp_demo, args = (queue_user_idp, queue_idp_user, ))
-    ca_thread = Thread(target = ca_demo, args = (queue_user_ca, queue_ca_user, ))
-    da_thread = Thread(target = da_demo, args = ())
+    idp_thread = Thread(target = idp_demo, args = (queue_user_idp, queue_idp_user, queue_le_idp, queue_idp_le, ))
+    ca_thread = Thread(target = ca_demo, args = (queue_user_ca, queue_ca_user, queue_ca_le, ))
+    da_thread = Thread(target = da_demo, args = (queue_le_da, queue_da_le, ))
+    le_thread = Thread(target = le_demo, args = (queue_ca_le, queue_le_idp, queue_idp_le, queue_le_da, queue_da_le, ))
 
     user_thread.start()
     idp_thread.start()
     ca_thread.start()
     da_thread.start()
+    le_thread.start()
 
 if __name__ == "__main__":
     main()
