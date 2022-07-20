@@ -1,52 +1,60 @@
 import hashlib
 import constants
 
-def reparam_verify_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, n, p_d, zkp_vc1):
-    c = zkp_ng2['c']
+def reparam_verify_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, h_4, n, p_d, zkp_vc1):
+    c = zkp_vc1['c']
     
-    t = zkp_ng2['t']
+    t = zkp_vc1['t']
     t_1 = t['t_1']
     t_2 = t['t_2']
     t_3 = t['t_3']
     t_4 = t['t_4']
     t_5 = t['t_5']
 
-    s = zkp_ng2['s']
+    s = zkp_vc1['s']
     s_1 = s['s_1']
     s_2 = s['s_2']
     s_3 = s['s_3']
     s_4 = s['s_4']
     s_5 = s['s_5']
     s_6 = s['s_6']
-    s_7 = s['s_7']
-    s_8 = s['s_8']
-    s_9 = s['s_9']
+    #s_7 = s['s_7']
+    #s_8 = s['s_8']
+    #s_9 = s['s_9']
 
     #do cheapest check first, hash < big exponentiations (I think)
+    string = constants.concat(g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, h_4, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5)
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
+
+    #do cheapest check first, hash < big exponentiations (I think)
+
+    c2 = 0
+    for byte in H:
+        c2 *= 256
+        c2 += int(byte)
     
-    h = hashlib.sha256()
-    h.update(concat(g_1, g_2, g_3, g_4, g_5, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5))
-    H = h.digest()
-    if (H != c):
+    if (c2 != c):
         return False
 
-    T_1 = ((g_1 ** s_1) * (g_2 ** s_2) * (g_3 ** s_3) * (g_4 ** s_4) * (g_5 ** s_5) * (y_1 ** c)) % n
+    T_1 = (pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(g_3, s_3, n) * pow(g_4, s_4, n) * pow(g_5, s_5, n) * pow(y_1, c, n)) % n
     if (T_1 != t_1):
         return False
 
-    T_2 = ((h_1 ** s_6) * (y_2 ** c)) % p_d
+    T_2 = (pow(h_1, s_6, p_d) * pow(y_2, c, p_d)) % p_d
     if (T_2 != t_2):
         return False
 
-    T_3 = ((h_2 ** s_6) * (y_3 ** c)) % p_d
+    T_3 = (pow(h_2, s_6, p_d) * pow(y_3, c, p_d)) % p_d
     if (T_3 != t_3):
         return False
 
-    T_4 = ((h_1 ** s_2) * (h_2 ** s_6) * (y_4 ** c)) % p_d
+    T_4 = (pow(h_1, s_2, p_d) * pow(h_3, s_6, p_d) * pow(y_4, c, p_d)) % p_d
     if (T_4 != t_4):
         return False
 
-    T_5 = ((h_3 ** s_6) * (y_5 ** c)) % p_d
+    T_5 = (pow(h_4, s_6, p_d) * pow(y_5, c, p_d)) % p_d
     if (T_5 != t_5):
         return False
 
@@ -72,27 +80,34 @@ def verify_zkp_vf_cred_1(w, A, m, zkp_vc1, pk_idp, pk_da):
     w_3 = w['w_3']
     w_4 = w['w_4']
 
-    y_1 = (d ** 2) % n
-    y_2 = w_1
-    y_3 = w_2
-    y_4 = w_3
-    y_5 = w_4
+    #use z instead of y this time because y is part of DA public key. probably change that to z later instead
+    z_1 = pow(d, 2, n)
+    z_2 = w_1
+    z_3 = w_2
+    z_4 = w_3
+    z_5 = w_4
     
-    #TODO DEFINE MOD_INV
-    g_1 = (A ** 2) % n
-    g_2 = (pow(a, -1, n) ** 2) % n #can just do pow -2. might also be faster to do pow for all the others
-    g_2 = (pow(b, -1, n) ** 2) % n #can just do pow -2. might also be faster to do pow for all the others
-    g_4 = (pow(v, -1, n) ** 2) % n #can just do pow -2. might also be faster to do pow for all the others
-    g_5 = (pow(h, -1, n) ** 2) % n #can just do pow -2. might also be faster to do pow for all the others
+    g_1 = pow(A, 2, n)
+    g_2 = pow(a, -2, n)
+    g_3 = pow(b, -2, n)
+    g_4 = pow(v, -2, n)
+    g_5 = pow(h, -2, n)
 
 
     #here don't use normal h name because we use h earlier
-    h256 = hashlib.sha256()
-    h256.update(concat(w_1, w_2, w_3, m))
-    H = h256.digest()
+    string = constants.concat(w_1, w_2, w_3, m)
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
+
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
 
     h_1 = g_d
     h_2 = h_d
-    h_3 = (y_1 * (y_2 ** H))
+    h_3 = y_3
+    h_4 = (y_1 * pow(y_2, c, p_d)) % p_d
 
-    return reparam_verify_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, n, p_d, zkp_vc1)
+    return reparam_verify_zkp_vf_cred_1(z_1, z_2, z_3, z_4, z_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, h_4, n, p_d, zkp_vc1)

@@ -11,7 +11,10 @@ def nym_gen_1(x_u, pk_idp):
     n = pk_idp['n']
 
     N_1 = secrets.randbits(constants.ELL_K)
-    r_1 = secrets.randbits(constants.ELL_DELTA + 1)
+    #r_1 = secrets.randbits(constants.ELL_DELTA + 1)
+    r_1 = secrets.randbits(constants.ELL_DELTA)
+    if secrets.randbits(1):
+        r_1 *= -1
     r_2 = secrets.randbits(2 * constants.ELL_N)
     r_3 = secrets.randbits(2 * constants.ELL_N)
 
@@ -43,19 +46,19 @@ def reparam_zkp_nym_gen_1(y_1, y_2, g_1, g_2, a_1, a_2, a_3, a_4, n):
 
     string = constants.concat(g_1, g_2, y_1, y_2, t_1, t_2)
 
-    h = hashlib.sha256()
-    h.update(string.encode())
-    H = h.digest()
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
 
     c = 0
     for byte in H:
         c *= 256
         c += int(byte)
 
-    s_1 = r_1 - c * a_1 # might need a modulus but idts
-    s_2 = r_2 - c * a_2 # might need a modulus but idts
-    s_3 = r_3 - c * a_3 # might need a modulus but idts
-    s_4 = r_4 - c * a_4 # might need a modulus but idts
+    s_1 = r_1 - c * a_1
+    s_2 = r_2 - c * a_2
+    s_3 = r_3 - c * a_3
+    s_4 = r_4 - c * a_4
     
     s = {
         's_1': s_1, 
@@ -98,20 +101,31 @@ def nym_gen_3(r_1, r, x_u, pk_idp):
     a = pk_idp['a']
     b = pk_idp['b']
     v = pk_idp['v']
+    g = pk_idp['g']
+    h = pk_idp['h']
     n = pk_idp['n']
 
-    x_u_o = secrets.randbits(constants.ELL_GAMMA + 1)
+    x_u_o = secrets.randbits(constants.ELL_GAMMA)
+    if secrets.randbits(1):
+        x_u_o *= -1
     r_4 = secrets.randbits(constants.ELL_N)
     
-    s_u = (((r_1 + r) % (2 << (constants.ELL_DELTA + 1)) - 1)) - (2 << constants.ELL_DELTA) + 1
-    P_u = (a ** x_u) * (b ** s_u) #mod n
-    s_tilde = math.floor((r_1 + r) / ((2 << (constants.ELL_DELTA + 1)) - 1))
-    C_3 = ((g ** s_tilde) * (h ** r_4)) % n
+    
+    s_u = (((r_1 + r) % (1 << (constants.ELL_DELTA + 1)) - 1)) - (1 << constants.ELL_DELTA) + 1
+    #TODO not sure if this is legal or ok but when s_u < 0 we break without this if
+    #the math shouldn't be allowed to break so this might be something to do with the python order of operations or interpretation of modulus 
+    #See commented out test in ``zkp_nym_gen_2()''
+    if (s_u < 0):
+        s_u += 1
+    P_u = (pow(a, x_u, n) * pow(b, s_u, n) * pow(v, x_u_o, n)) % n
+    s_tilde = math.floor((r_1 + r) / ((1 << (constants.ELL_DELTA + 1)) - 1))
+    C_3 = (pow(g, s_tilde, n) * pow(h, r_4, n)) % n
 
     out_dict = {
         's_u':s_u,
         'P_u':P_u,
         'x_u':x_u,
+        'x_u_o':x_u_o,
         'r_4':r_4,
         'C_3':C_3,
         's_tilde':s_tilde
@@ -131,32 +145,31 @@ def reparam_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1,
     r_8 = secrets.randbelow(n)
     r_9 = secrets.randbelow(n)
 
-    #Ord(QRn) == p'q', so order of each element guaranteed to be big
+    t_1 = (pow(g_1, r_1, n) * pow(g_2, r_2, n)) % n
+    t_2 = (pow(g_1, r_3, n) * pow(g_2, r_4, n)) % n
+    t_3 = (pow(g_1, r_5, n) * pow(g_2, r_6, n)) % n
+    t_4 = (pow(g_1, r_7, n) * pow(g_2, r_8, n)) % n
+    t_5 = (pow(g_3, r_3, n) * pow(g_4, r_7, n) * pow(g_5, r_9, n)) % n
 
-    t_1 = ((g_1 ** r_1) * (g_2 ** r_2)) % n
-    t_2 = ((g_1 ** r_3) * (g_2 ** r_4)) % n
-    t_3 = ((g_1 ** r_5) * (g_2 ** r_6)) % n
-    t_4 = ((g_1 ** r_7) * (g_2 ** r_8)) % n
-    t_5 = ((g_3 ** r_3) * (g_4 ** r_7) * (g_5 ** r_9)) % n
-
-    h = hashlib.sha256()
-    h.update(concat(g_1, g_2, g_3, g_4, g_5, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5))
-    H = h.digest()
+    string = constants.concat(g_1, g_2, g_3, g_4, g_5, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5)
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
 
     c = 0
     for byte in H:
         c *= 256
         c += int(byte)
 
-    s_1 = r_1 - c * a_1 # might need a modulus but idts
-    s_2 = r_2 - c * a_2 # might need a modulus but idts
-    s_3 = r_3 - c * a_3 # might need a modulus but idts
-    s_4 = r_4 - c * a_4 # might need a modulus but idts
-    s_5 = r_5 - c * a_5 # might need a modulus but idts
-    s_6 = r_6 - c * a_6 # might need a modulus but idts
-    s_7 = r_7 - c * a_7 # might need a modulus but idts
-    s_8 = r_8 - c * a_8 # might need a modulus but idts
-    s_9 = r_9 - c * a_9 # might need a modulus but idts
+    s_1 = r_1 - c * a_1
+    s_2 = r_2 - c * a_2
+    s_3 = r_3 - c * a_3
+    s_4 = r_4 - c * a_4
+    s_5 = r_5 - c * a_5
+    s_6 = r_6 - c * a_6
+    s_7 = r_7 - c * a_7
+    s_8 = r_8 - c * a_8
+    s_9 = r_9 - c * a_9
     
     s = {
         's_1': s_1, 
@@ -194,23 +207,33 @@ def zkp_nym_gen_2(C_1, C_2, C_3, R, P_u, x_u, x_u_o, s_u, s_tilde, pk_idp):
 
     n = pk_idp['n']
     
+    g = pk_idp['g']
     h = pk_idp['h']
     a = pk_idp['a']
     b = pk_idp['b']
     v = pk_idp['v']
 
-    g_1 = (g ** 2) % n
-    g_2 = (h ** 2) % n
-    g_3 = (a ** 2) & n
-    g_4 = (b ** 2) & n
-    g_5 = (v ** 2) & n
+    g_1 = pow(g, 2, n)
+    g_2 = pow(h, 2, n)
+    g_3 = pow(a, 2, n)
+    g_4 = pow(b, 2, n)
+    g_5 = pow(v, 2, n)
 
-    y_1 = (C_1 ** 2) % n
-    y_2 = (C_2 ** 2) % n
-    y_3 = (C_3 ** 2) % n
-    y_4 = (y_1 * (g_1 ** (r - (2 << constants.ELL_DELTA) + 1))) / (y_3 ** ((2 << (constants.ELL_DELTA + 1)) - 1))
-    y_5 = (P_u ** 2) % n
+    y_1 = pow(C_1, 2, n)
+    y_2 = pow(C_2, 2, n)
+    y_3 = pow(C_3, 2, n)
+    #nested pow can probably be one with a negative exponent but idk if negative powers work in general or just for modular inverse
+    y_4 = ((y_1 * pow(g_1, r - (1 << constants.ELL_DELTA) + 1, n)) * pow(pow(y_3, (1 << (constants.ELL_DELTA + 1)) - 1, n), -1 , n)) % n
+    y_5 = pow(P_u, 2, n)
         
+    #TODO fix this so it works when s_u is negative (see nym_gen_3)
+    # check if s_tilde formed correctly. when s_u < 0 we have s_u = check - 1
+    # check = (r_1 + r - (1 << constants.ELL_DELTA) + 1) - s_tilde * ((1 << (constants.ELL_DELTA + 1)) - 1)
+    # print("s_u = ",s_u)
+    # print("check = ", check)
+    # if not s_u == check:
+    #     print(s_u, "!=", check)
+    #     print ("S_TILDE NOT PROPERLY FORMED")
     a_1 = r_1
     a_2 = r_2
     a_3 = x_u
@@ -218,51 +241,50 @@ def zkp_nym_gen_2(C_1, C_2, C_3, R, P_u, x_u, x_u_o, s_u, s_tilde, pk_idp):
     a_5 = s_tilde
     a_6 = r_4
     a_7 = s_u
-    a_8 = r_2 - r_4 * ((2 << (constants.ELL_DELTA + 1)) - 1)
+    a_8 = r_2 - r_4 * ((1 << (constants.ELL_DELTA + 1)) - 1)
     a_9 = x_u_o
 
     return reparam_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1, a_2, a_3, a_4, a_5, a_6, a_7, a_8, a_9, n)
 
 def nym_gen_4(x_u, pk_da):
-    #ng4_dict = json.loads(json_string)
-    #x_u = ng4_dict['x_u']
-    #pk_da = ng4_dict['pk_da']
     g_d = pk_da['g_d']
     p_d = pk_da['p_d']
 
-    Y_u = (g_d ** x_u) % p_d
+    Y_u = pow(g_d, x_u, p_d)
 
-    return Y_u
+    out_dict = {'Y_u':Y_u}
+
+    return out_dict
 
 # $$ PK\{ (a_1, a_2, a_3) : y_1 = g_1^{a_1}g_2^{a_2}g_3^{a_3} \land y_2 = h ^ a_1 \land -2^{constants.ELL\_DELTA} < a_3 < -2^{constants.ELL\_DELTA} \} $$
-def reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, a_1, a_2, a_3, n, p_d):
+def reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h_1, a_1, a_2, a_3, n, p_d):
     r_1 = secrets.randbelow(n)
     r_2 = secrets.randbelow(n)
     r_3 = secrets.randbelow(n)
 
     #Ord(QRn) == p'q', so order of each element guaranteed to be big
-    #NEED TO INCORPORATE P AND/OR Q
+    
+    t_1 = (pow(g_1, r_1, n) * pow(g_2, r_2, n) * pow(g_3, r_3, n)) % n
+    t_2 = pow(h_1, r_1, p_d)
 
-    t_1 = ((g_1 ** r_1) * (g_2 ** r_2) * (g_3 ** r_3)) % n
-    t_2 = (h ** r_1) % p_d
-
-    h = hashlib.sha256()
-    h.update(concat(g_1, g_2, g_3, h, y_1, y_2, t_1, t_2))
-    H = h.digest()
+    string = constants.concat(g_1, g_2, g_3, h_1, y_1, y_2, t_1, t_2)
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
 
     c = 0
     for byte in H:
         c *= 256
         c += int(byte)
 
-    s_1 = r_1 - c * a_1 # might need a modulus but idts
-    s_2 = r_2 - c * a_2 # might need a modulus but idts
-    s_3 = r_3 - c * a_3 # might need a modulus but idts
+    s_1 = r_1 - c * a_1
+    s_2 = r_2 - c * a_2
+    s_3 = r_3 - c * a_3
 
     s = {
         's_1': s_1, 
         's_2': s_2, 
-        's_3': s_3, 
+        's_3': s_3
     }
     t = {
         't_1': t_1,
@@ -286,45 +308,45 @@ def zkp_nym_gen_3(P_u, Y_u, x_u, x_u_o, s_u, pk_idp, pk_da):
     p_d = pk_da['p_d']
     g_d = pk_da['g_d']
 
-    y_1 = (P_u ** 2) % n
+    y_1 = pow(P_u, 2, n)
     y_2 = Y_u
     
-    g_1 = (a ** 2) % n
-    g_2 = (b ** 2) % n
-    g_2 = (v ** 2) % n
+    g_1 = pow(a, 2, n)
+    g_2 = pow(b, 2, n)
+    g_3 = pow(v, 2, n)
 
-    h = g_d
+    h_1 = g_d
     
     a_1 = x_u
     a_2 = s_u
     a_3 = x_u_o
 
-    return reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h, a_1, a_2, a_3, n, p_d)
+    return reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h_1, a_1, a_2, a_3, n, p_d)
 
 #cred_gen
 
 # $$ PK\{ (a_1, a_2, a_3) : y_1 = g_1^{a_1}g_2^{a_2}g_3^{a_3} \land -2^{constants.ELL\_DELTA} < a_3 < -2^{constants.ELL\_DELTA} \} $$
-def reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, g_3, a_1, a_2, a_3, n):
+def reparam_zkp_cred_gen_1(y_1, g_1, g_2, g_3, a_1, a_2, a_3, n):
     r_1 = secrets.randbelow(n)
     r_2 = secrets.randbelow(n)
     r_3 = secrets.randbelow(n)
 
-    #Ord(QRn) == p'q', so order of each element guaranteed to be big
 
-    t_1 = ((g_1 ** r_1) * (g_2 ** r_2) * (g_3 ** r_3)) % n
+    t_1 = (pow(g_1, r_1, n) * pow(g_2, r_2, n) * pow(g_3, r_3, n)) % n
 
-    h = hashlib.sha256()
-    h.update(concat(g_1, g_2, g_3, y_1, t_1))
-    H = h.digest()
+    string = constants.concat(g_1, g_2, g_3, y_1, t_1)
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
 
     c = 0
     for byte in H:
         c *= 256
         c += int(byte)
 
-    s_1 = r_1 - c * a_1 # might need a modulus but idts
-    s_2 = r_2 - c * a_2 # might need a modulus but idts
-    s_3 = r_3 - c * a_3 # might need a modulus but idts
+    s_1 = r_1 - c * a_1
+    s_2 = r_2 - c * a_2
+    s_3 = r_3 - c * a_3
 
     s = {
         's_1': s_1, 
@@ -340,7 +362,6 @@ def reparam_zkp_cred_gen_1(y_1, y_2, g_1, g_2, g_3, a_1, a_2, a_3, n):
         's': s,
         't': t
     }
-
     return zkp
 
 def zkp_cred_gen_1(P_u, x_u, x_u_o, s_u, pk_idp):
@@ -349,26 +370,26 @@ def zkp_cred_gen_1(P_u, x_u, x_u_o, s_u, pk_idp):
     b = pk_idp['b']
     v = pk_idp['v']
 
-    y_1 = (P_u ** 2) % n
+    y_1 = pow(P_u, 2, n)
     
-    g_1 = (a ** 2) % n
-    g_2 = (b ** 2) % n
-    g_3 = (v ** 2) % n
+    g_1 = pow(a, 2, n)
+    g_2 = pow(b, 2, n)
+    g_3 = pow(v, 2, n)
 
     a_1 = x_u
     a_2 = s_u
     a_3 = x_u_o
 
-    return reparam_zkp_nym_gen_1(y_1, y_2, g_1, g_2, g_3, a_1, a_2, a_3, n),
+    return reparam_zkp_cred_gen_1(y_1, g_1, g_2, g_3, a_1, a_2, a_3, n)
 
 def cred_gen_2(e_u, c_u, P_u, pk_idp):
     d = pk_idp['d']
     n = pk_idp['n']
 
-    lhs = (c_u ** e_u) % n
+    lhs = pow(c_u, e_u, n)
     rhs = (P_u * d) % n
 
-    return (lhs == rhs)
+    return lhs == rhs
 
 #verify_cred
 
@@ -386,19 +407,24 @@ def verify_cred_1(c_u, Y_u, m, pk_idp, pk_da):
     r_1 = secrets.randbits(2 * constants.ELL_N)
     r_2 = secrets.randbelow(n)
 
+    w_1 = pow(g_d, r_1, p_d)
+    w_2 = pow(h_d, r_1, p_d)
+    w_3 = (pow(y_3, r_1, p_d) * Y_u) % p_d
 
 
-    w_1 = (g_d ** r_2) % p_d
-    w_2 = (h_d ** r_2) % p_d
-    w_3 = ((y_3 ** r_2) * Y_u) % p_d
+    hasher = hashlib.sha256()
+    string = constants.concat(w_1, w_2, w_3, m)
+    hasher.update(string.encode())
+    H = hasher.digest()
 
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
 
-    h = hashlib.sha256()
-    #should be concat
-    h.update(w_1 * w_2 * w_3 * m)
-    w_4 = ((y_1 ** r_2) * (y_2 ** (r_2 * h.digest()))) % p_d
+    w_4 = (pow(y_1, r_1, p_d) * pow(y_2, r_1 * c, p_d)) % p_d
 
-    A = c_u * (h ** r_1) #mod n?
+    A = (c_u * pow(h, r_1, n)) % n
 
     out_dict = {
         'r_1':r_1,
@@ -414,7 +440,7 @@ def verify_cred_1(c_u, Y_u, m, pk_idp, pk_da):
 
 # $$ PK\{ (a_1, a_2, a_3, a_4, a_5, a_6) : y_1 = g_1^{a_1}g_2^{a_2}g_3^{a_3}g_4^{a_4}g_5^{a_5} 
 #       \land y_2 = h_1^{a_6} \land y_3 = h_2^{a_6} \land y_4 = h_1^{a_2}h_2^{a_6} \land y_5=h_3^{a_6}\} $$
-def reparam_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, a_1, a_2, a_3, a_4, a_5, a_6, n, p_d):
+def reparam_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, h_4, a_1, a_2, a_3, a_4, a_5, a_6, n, p_d):
     r_1 = secrets.randbelow(n)
     r_2 = secrets.randbelow(n)
     r_3 = secrets.randbelow(n)
@@ -422,29 +448,28 @@ def reparam_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1,
     r_5 = secrets.randbelow(n)
     r_6 = secrets.randbelow(n)
 
-    #Ord(QRn) == p'q', so order of each element guaranteed to be big
+    t_1 = (pow(g_1, r_1, n) * pow(g_2, r_2, n) * pow(g_3, r_3, n) * pow(g_4, r_4, n) * pow(g_5, r_5, n)) % n
+    t_2 = pow(h_1, r_6, p_d)
+    t_3 = pow(h_2, r_6, p_d)
+    t_4 = (pow(h_1, r_2, p_d) * pow(h_3, r_6, p_d)) % p_d
+    t_5 = pow(h_4, r_6, p_d)
 
-    t_1 = ((g_1 ** r_1) * (g_2 ** r_2) * (g_3 ** r_3) * (g_4 ** r_4) * (g_5 ** r_5)) % n
-    t_2 = (h_1 ** a_6) % p_d
-    t_3 = (h_2 ** a_6) % p_d
-    t_4 = ((h_1 ** a_2) * (h_2 ** a_6)) % p_d
-    t_5 = (h_3 ** a_6) % p_d
-
-    h = hashlib.sha256()
-    h.update(concat(g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5))
-    H = h.digest()
+    string = constants.concat(g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, h_4, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5)
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
 
     c = 0
     for byte in H:
         c *= 256
         c += int(byte)
 
-    s_1 = r_1 - c * a_1 # might need a modulus but idts
-    s_2 = r_2 - c * a_2 # might need a modulus but idts
-    s_3 = r_3 - c * a_3 # might need a modulus but idts
-    s_4 = r_4 - c * a_4 # might need a modulus but idts
-    s_5 = r_5 - c * a_5 # might need a modulus but idts
-    s_6 = r_6 - c * a_6 # might need a modulus but idts
+    s_1 = r_1 - c * a_1
+    s_2 = r_2 - c * a_2
+    s_3 = r_3 - c * a_3
+    s_4 = r_4 - c * a_4
+    s_5 = r_5 - c * a_5
+    s_6 = r_6 - c * a_6
 
     s = {
         's_1': s_1, 
@@ -490,33 +515,39 @@ def zkp_vf_cred_1(w, A, m, r_1, r_2, e_u, x_u, x_u_o, s_u, pk_idp, pk_da):
     w_3 = w['w_3']
     w_4 = w['w_4']
 
-    y_1 = (d ** 2) % n
-    y_2 = w_1
-    y_3 = w_2
-    y_4 = w_3
-    y_5 = w_4
+    #use z instead of y this time because y is part of DA public key. probably change that to z later instead
+    z_1 = pow(d, 2, n)
+    z_2 = w_1
+    z_3 = w_2
+    z_4 = w_3
+    z_5 = w_4
+
+    g_1 = pow(A, 2, n)
+    g_2 = pow(a, -2, n)
+    g_3 = pow(b, -2, n)
+    g_4 = pow(v, -2, n)
+    g_5 = pow(h, -2, n)
+
+    string = constants.concat(w_1, w_2, w_3, m)
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
+
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
     
-    #TODO DEFINE MOD_INV
-    g_1 = (A ** 2) % n
-    g_2 = (pow(a, -1, n) ** 2) % n #can just do pow -2. might also be faster to do pow for all the others
-    g_2 = (pow(b, -1, n) ** 2) % n #can just do pow -2. might also be faster to do pow for all the others
-    g_4 = (pow(v, -1, n) ** 2) % n #can just do pow -2. might also be faster to do pow for all the others
-    g_5 = (pow(h, -1, n) ** 2) % n #can just do pow -2. might also be faster to do pow for all the others
-
-    #here we don't use normal h name because h is taken
-    h256 = hashlib.sha256()
-    h256.update(concat(w_1, w_2, w_3, m))
-    H = h256.digest()
-
     h_1 = g_d
     h_2 = h_d
-    h_3 = (y_1 * (y_2 ** H))
+    h_3 = y_3
+    h_4 = (y_1 * pow(y_2, c, p_d)) % p_d
     
     a_1 = e_u
     a_2 = x_u
     a_3 = s_u
-    a_4 = r_1
-    a_5 = r_2
-    a_6 = x_u_o
+    a_4 = x_u_o
+    a_5 = r_1 * e_u
+    a_6 = r_1
 
-    return reparam_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, a_1, a_2, a_3, a_4, a_5, a_6, n, p_d)
+    return reparam_zkp_vf_cred_1(z_1, z_2, z_3, z_4, z_5, g_1, g_2, g_3, g_4, g_5, h_1, h_2, h_3, h_4, a_1, a_2, a_3, a_4, a_5, a_6, n, p_d)
