@@ -1,14 +1,10 @@
 import constants
 import secrets
-import hashlib
 import user
 #nym_gen
 
 def nym_gen_2():
-    #r = secrets.randbits(constants.ELL_DELTA + 1)
-    r = secrets.randbits(constants.ELL_DELTA)
-    if secrets.randbits(1):
-        r *= -1
+    r = constants.rand_in_range(constants.ELL_DELTA)
     N_2 = secrets.randbits(constants.ELL_K)
 
     ng2_dict = {
@@ -30,28 +26,17 @@ def reparam_verify_zkp_nym_gen_1(y_1, y_2, g_1, g_2, n, zkp_ng1):
     s_3 = s['s_3']
     s_4 = s['s_4']
 
+    hash_str = constants.hash_str(g_1, g_2, y_1, y_2, t_1, t_2)
 
-    string = constants.concat(g_1, g_2, y_1, y_2, t_1, t_2)
-    hasher = hashlib.sha256()
-    hasher.update(string.encode())
-    H = hasher.digest()
-
-    #do cheapest check first, hash < big exponentiations (I think)
-
-    c2 = 0
-    for byte in H:
-        c2 *= 256
-        c2 += int(byte)
-    
-    if (c2 != c):
+    if (hash_str != c):
         return False
 
-    T_1 = (pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(y_1, c, n)) % n
-    if (T_1 != t_1):
+    T_1 = pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(y_1, c, n) % n
+    if T_1 != t_1:
         return False
 
-    T_2 = (pow(g_1, s_3, n) * pow(g_2, s_4, n) * pow(y_2, c, n)) % n
-    if (T_2 != t_2):
+    T_2 = pow(g_1, s_3, n) * pow(g_2, s_4, n) * pow(y_2, c, n) % n
+    if T_2 != t_2:
         return False
 
     return True
@@ -93,38 +78,29 @@ def reparam_verify_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_
     s_9 = s['s_9']
 
     #do cheapest check first, hash < big exponentiations (I think)
-    
-    string = constants.concat(g_1, g_2, g_3, g_4, g_5, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5)
-    hasher = hashlib.sha256()
-    hasher.update(string.encode())
-    H = hasher.digest()
-    
-    c2 = 0
-    for byte in H:
-        c2 *= 256
-        c2 += int(byte)
-    
-    if (c2 != c):
+    hash_str = constants.hash_str(g_1, g_2, g_3, g_4, g_5, y_1, y_2, y_3, y_4, y_5, t_1, t_2, t_3, t_4, t_5)
+
+    if hash_str != c:
         return False
 
-    T_1 = (pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(y_1, c, n)) % n
-    if (T_1 != t_1):
+    T_1 = pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(y_1, c, n) % n
+    if T_1 != t_1:
         return False
 
-    T_2 = (pow(g_1, s_3, n) * pow(g_2, s_4, n) * pow(y_2, c, n)) % n
-    if (T_2 != t_2):
+    T_2 = pow(g_1, s_3, n) * pow(g_2, s_4, n) * pow(y_2, c, n) % n
+    if T_2 != t_2:
         return False
 
-    T_3 = (pow(g_1, s_5, n) * pow(g_2, s_6, n) * pow(y_3, c, n)) % n
-    if (T_3 != t_3):
+    T_3 = pow(g_1, s_5, n) * pow(g_2, s_6, n) * pow(y_3, c, n) % n
+    if T_3 != t_3:
         return False
 #T_4 check fails
-    T_4 = (pow(g_1, s_7, n) * pow(g_2, s_8, n) * pow(y_4, c, n)) % n
-    if (T_4 != t_4):
+    T_4 = pow(g_1, s_7, n) * pow(g_2, s_8, n) * pow(y_4, c, n) % n
+    if T_4 != t_4:
         return False
 
-    T_5 = (pow(g_3, s_3, n) * pow(g_4, s_7, n) * pow(g_5, s_9, n) * pow(y_5, c, n)) % n
-    if (T_5 != t_5):
+    T_5 = pow(g_3, s_3, n) * pow(g_4, s_7, n) * pow(g_5, s_9, n) * pow(y_5, c, n) % n
+    if T_5 != t_5:
         return False
 
     return True
@@ -148,7 +124,7 @@ def verify_zkp_nym_gen_2(C_1, C_2, C_3, r, P_u, pk_idp, zkp_ng2):
     y_2 = pow(C_2, 2, n)
     y_3 = pow(C_3, 2, n)
     #nested pow can probably be one with a negative exponent but idk if negative powers work in general or just for modular inverse
-    y_4 = ((y_1 * pow(g_1, (r - (1 << constants.ELL_DELTA) + 1), n)) * pow(pow(y_3, (1 << (constants.ELL_DELTA + 1)) - 1, n), -1, n)) % n
+    y_4 = (y_1 * pow(g_1, (r - (1 << constants.ELL_DELTA) + 1), n)) * pow(pow(y_3, (1 << (constants.ELL_DELTA + 1)) - 1, n), -1, n) % n
     y_5 = pow(P_u, 2, n)
 
     return reparam_verify_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, n, zkp_ng2)
@@ -166,25 +142,17 @@ def reparam_verify_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h_1, n, p_d, zkp_ng3):
     s_2 = s['s_2']
     s_3 = s['s_3']
 
-    string = constants.concat(g_1, g_2, g_3, h_1, y_1, y_2, t_1, t_2)
-    hasher = hashlib.sha256()
-    hasher.update(string.encode())
-    H = hasher.digest()
-    
-    c2 = 0
-    for byte in H:
-        c2 *= 256
-        c2 += int(byte)
-    
-    if (c2 != c):
+    hash_str = constants.hash_str(g_1, g_2, g_3, h_1, y_1, y_2, t_1, t_2)
+
+    if hash_str != c:
         return False
 
-    T_1 = (pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(g_3, s_3, n) * pow(y_1, c, n)) % n
-    if (T_1 != t_1):
+    T_1 = pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(g_3, s_3, n) * pow(y_1, c, n) % n
+    if T_1 != t_1:
         return False
 
-    T_2 = (pow(h_1, s_1, p_d) * pow(y_2, c, p_d)) % p_d
-    if (T_2 != t_2):
+    T_2 = pow(h_1, s_1, p_d) * pow(y_2, c, p_d) % p_d
+    if T_2 != t_2:
         return False
 
     return True
@@ -222,23 +190,14 @@ def reparam_verify_zkp_cred_gen_1(y_1, g_1, g_2, g_3, n, zkp_cg1):
     s_2 = s['s_2']
     s_3 = s['s_3']
 
-    string = constants.concat(g_1, g_2, g_3, y_1, t_1)
-    hasher = hashlib.sha256()
-    hasher.update(string.encode())
-    H = hasher.digest()
-
     #do cheapest check first, hash < big exponentiations (I think)
+    hash_str = constants.hash_str(g_1, g_2, g_3, y_1, t_1)
 
-    c2 = 0
-    for byte in H:
-        c2 *= 256
-        c2 += int(byte)
-
-    if (c2 != c):
+    if (hash_str != c):
         return False
 
-    T_1 = (pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(g_3, s_3, n) * pow(y_1, c, n)) % n
-    if (T_1 != t_1):
+    T_1 = pow(g_1, s_1, n) * pow(g_2, s_2, n) * pow(g_3, s_3, n) * pow(y_1, c, n) % n
+    if T_1 != t_1:
         return False
 
     return True

@@ -3,6 +3,7 @@ import os
 from os.path import exists
 import json
 from Crypto.Util.number import isPrime
+import hashlib
 
 ELL_GAMMA = 128
 ELL_N = 256 #2048
@@ -29,6 +30,19 @@ def concat(*argv):
         string += str(arg)
 
     return string
+
+def hash_str(*argv):
+    string = concat(*argv)
+    hasher = hashlib.sha256()
+    hasher.update(string.encode())
+    H = hasher.digest()
+
+    c = 0
+    for byte in H:
+        c *= 256
+        c += int(byte)
+
+    return c
 
 def clear_keys():
     if exists(PK_IDP_PATH):
@@ -89,7 +103,7 @@ def publish_pk_idp(pk_idp):
         file.close()
 
 def import_pk_idp():
-    while(not exists(PK_IDP_PATH)):
+    while not exists(PK_IDP_PATH):
         continue
     with open(PK_IDP_PATH, 'r') as file:
         pk_idp = json.load(file)
@@ -102,16 +116,17 @@ def init_da_key():
     #https://crypto.stackexchange.com/questions/22716/generation-of-a-cyclic-group-of-prime-order
     #on generating group of order q_d (use z^*_{p_d}) where q_d | p_d - 1
 
-    #q_d > 2^ELL_DELTA
-    q_d = secrets.randbits(ELL_DELTA + 1)
+    #q_d > 2^ELL_DELTA so choose ELL_DELTA (<= 2^ELL_DELTA - 1) random bits and add 2 ^ ELL_DELTA
+    q_d = secrets.randbits(ELL_DELTA) + (1 << ELL_DELTA)
     p_d = 1
     fac = 0
-    while(not isPrime(p_d)):
-        while ((not isPrime(q_d)) and (q_d < (2 << ELL_DELTA))):
-            q_d = secrets.randbits(ELL_DELTA + 1)
+    while not isPrime(p_d):
+        while not isPrime(q_d):
+            q_d = secrets.randbits(ELL_DELTA) + (1 << ELL_DELTA)
         for i in range(2, 1001, 2):
             p_d = i * q_d + 1
             if isPrime(p_d):
+                #don't actually need fac but useful for debugging
                 fac = i
                 break
 
@@ -132,9 +147,9 @@ def init_da_key():
     x_4 = secrets.randbelow(q_d)
     x_5 = secrets.randbelow(q_d)
 
-    y_1 = (pow(g, x_1, p_d) * pow(h, x_2, p_d)) % p_d
-    y_2 = (pow(g, x_3, p_d) * pow(h, x_4, p_d)) % p_d
-    y_3 = pow(g, x_5, p_d)
+    z_1 = pow(g, x_1, p_d) * pow(h, x_2, p_d) % p_d
+    z_2 = pow(g, x_3, p_d) * pow(h, x_4, p_d) % p_d
+    z_3 = pow(g, x_5, p_d)
 
     sk_da = {
         'x_1':x_1,
@@ -145,21 +160,16 @@ def init_da_key():
     }
 
     pk_da = {
-        'y_1': y_1,
-        'y_2': y_2,
-        'y_3': y_3,
+        'z_1': z_1,
+        'z_2': z_2,
+        'z_3': z_3,
         'g_d': g,
         'h_d': h,
         'p_d': p_d
     }
     return (pk_da, sk_da)
 
-def publish_pk_da(pk_da):
-    #pk_da_json = json.dumps(pk_da, indent = 4)
-    #f = open(PK_DA_PATH, "w")
-    #f.write(pk_da_json)
-    #f.close()
-    
+def publish_pk_da(pk_da):    
     with open(PK_DA_PATH, 'w') as file:
         json.dump(pk_da, file)
         file.close()
@@ -175,8 +185,5 @@ def import_pk_da():
     return {}
 
 def init_user_key():
-    #return secrets.randbits(ELL_GAMMA + 1) #x_u in GAMMA = (-2^ELL_GAMMA, 2^ELL_GAMMA)
-    x_u = secrets.randbits(ELL_GAMMA)
-    if secrets.randbits(1):
-        x_u *= -1
+    x_u = rand_in_range(ELL_GAMMA)
     return x_u

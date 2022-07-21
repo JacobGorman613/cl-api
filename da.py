@@ -1,4 +1,3 @@
-import hashlib
 import constants
 
 def deanon_1(w, m, pk_da, sk_da):
@@ -14,17 +13,9 @@ def deanon_1(w, m, pk_da, sk_da):
     w_3 = w['w_3']
     w_4 = w['w_4']
 
-    string = constants.concat(w_1, w_2, w_3, m)
-    hasher = hashlib.sha256()
-    hasher.update(string.encode())
-    H = hasher.digest()
+    c = constants.hash_str(w_1, w_2, w_3, m)
 
-    c = 0
-    for byte in H:
-        c *= 256
-        c += int(byte)
-
-    rhs = (pow(w_1, (x_1 + x_3 * c), p_d) * pow(w_2, (x_2 + x_4 * c), p_d)) % p_d
+    rhs = pow(w_1, (x_1 + x_3 * c), p_d) * pow(w_2, (x_2 + x_4 * c), p_d) % p_d
 
     return w_4 == rhs
 
