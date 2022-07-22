@@ -46,7 +46,13 @@ def reparam_verify_zkp_vf_cred_1(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_
 
     return True
 
-def verify_zkp_vf_cred_1(w, A, m, zkp_vc1, pk_idp, pk_da):
+def verify_cred_2(vc1_out, pk_idp, pk_da):
+#def verify_zkp_vf_cred_1(vc1_out, pk_idp, pk_da):
+    w = vc1_out['deanon_str']['w']
+    m = vc1_out['deanon_str']['m']
+    A = vc1_out['A']
+    zkp_vc1 = vc1_out['zkp_vc1']
+
     n = pk_idp['n']
     a = pk_idp['a']
     b = pk_idp['b']

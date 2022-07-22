@@ -175,7 +175,7 @@ def publish_pk_da(pk_da):
         file.close()
 
 def import_pk_da():
-    while(not exists(PK_DA_PATH)):
+    while not exists(PK_DA_PATH):
         continue
     with open(PK_DA_PATH, 'r') as file:
         pk_da = json.load(file)

@@ -7,7 +7,6 @@ import constants
 from threading import Thread
 from multiprocessing import Queue
 
-import time
 import json
 
 def user_demo(queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user):
@@ -18,126 +17,45 @@ def user_demo(queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user):
 #NYM GEN
     ng1_out = user.nym_gen_1(x_u, pk_idp)
 
-    C_1 = ng1_out['C_1']
-    C_2 = ng1_out['C_2']
-    N_1 = ng1_out['N_1']
-    r_1 = ng1_out['r_1']
-    r_2 = ng1_out['r_2']
-    r_3 = ng1_out['r_3']
-
-    zkp_ng1 = user.zkp_nym_gen_1(C_1, C_2, r_1, r_2, r_3, x_u, pk_idp)
-
-    nym_gen_msg_1 = {
-        'N_1' : N_1,
-        'C_1' : C_1,
-        'C_2' : C_2,
-        'zkp_ng1' : zkp_ng1
-    }
-
-    queue_user_idp.put(json.dumps(nym_gen_msg_1))
-
-    while(queue_idp_user.empty()):
-        continue
-    nym_gen_msg_2 = json.loads(queue_idp_user.get())
-
-    r = nym_gen_msg_2['r']
-    N_2 = nym_gen_msg_2['N_2']
-
-    nym = constants.concat(N_1, N_2)
-
-    ng3_out = user.nym_gen_3(r_1, r, x_u, pk_idp)
-
-    s_u = ng3_out['s_u']
-    P_u = ng3_out['P_u']
-    x_u_o = ng3_out['x_u_o']
-    r_4 = ng3_out['r_4']
-    C_3 = ng3_out['C_3']
-    s_tilde = ng3_out['s_tilde']
-
-    #redefining as R is inconvenient and probably a bad idea, just made the diagram more bearable
-    R = {
-        'r': r,
-        'r_1': r_1,
-        'r_2': r_2,
-        'r_3': r_3,
-        'r_4': r_4
-    }
-
-    zkp_ng2 = user.zkp_nym_gen_2(C_1, C_2, C_3, R, P_u, x_u, x_u_o, s_u, s_tilde, pk_idp)
-
-    ng4_out = user.nym_gen_4(x_u, pk_da)
-
-    Y_u = ng4_out['Y_u']
-
-    zkp_ng3 = user.zkp_nym_gen_3(P_u, Y_u, x_u, x_u_o, s_u, pk_idp, pk_da)
-
-    nym_gen_msg_3 = {
-        'P_u':P_u,
-        'Y_u':Y_u,
-        'C_3':C_3,
-        's_tilde':s_tilde,
-        'zkp_ng2':zkp_ng2,
-        'zkp_ng3':zkp_ng3
-    }
-
-    queue_user_idp.put(json.dumps(nym_gen_msg_3))
-
-    #STORE x_u_o, s_u, nym, Y_u, P_u
-
-    zkp_cg1 = user.zkp_cred_gen_1(P_u, x_u, x_u_o, s_u, pk_idp)
-
-    cred_gen_msg_1 = {
-        'nym': nym,
-        'P_u': P_u,
-        'zkp_cg1': zkp_cg1
-    }
-
-    queue_user_idp.put(json.dumps(cred_gen_msg_1))
+    queue_user_idp.put(json.dumps(ng1_out['send']))
 
     while queue_idp_user.empty():
         continue
-    cred_gen_msg_2 = json.loads(queue_idp_user.get())
+    nym_gen_msg_2 = json.loads(queue_idp_user.get())
 
-    e_u = cred_gen_msg_2['e_u']
-    c_u = cred_gen_msg_2['c_u']
+    ng3_out = user.nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da)
 
-    cred_record_correct = user.cred_gen_2(e_u, c_u, P_u, pk_idp)
+    primary_cred = ng3_out['primary_cred']
+
+    nym_gen_msg_3 = ng3_out['send']
+
+    queue_user_idp.put(json.dumps(nym_gen_msg_3))
+
+    #STORE primary_cred
+
+#CRED GEN
+    cg1_out = user.cred_gen_1(x_u, primary_cred, pk_idp)
+
+    queue_user_idp.put(json.dumps(cg1_out))
+
+    while queue_idp_user.empty():
+        continue
+
+    #sub_cred = cred_gen_msg_2
+    sub_cred = json.loads(queue_idp_user.get())
+
+    cred_record_correct = user.cred_gen_3(primary_cred, sub_cred, pk_idp)
 
     print("cred_record_correct =", cred_record_correct)
     
-    #store e_u and c_u
+    #store sub_cred
 
-    #VERIFY CRED
-
+#VERIFY CRED
     m = "i agree not to post ncp or you can deanonymize me"
 
-    vc1_out = user.verify_cred_1(c_u, Y_u, m, pk_idp, pk_da)
+    vc1_out = user.verify_cred_1(x_u, primary_cred, sub_cred, m, pk_idp, pk_da)
 
-    r_1 = vc1_out['r_1']
-    r_2 = vc1_out['r_2']
-    w_1 = vc1_out['w_1']
-    w_2 = vc1_out['w_2']
-    w_3 = vc1_out['w_3']
-    w_4 = vc1_out['w_4']
-    A = vc1_out['A']
-
-    w = {
-        'w_1':w_1,
-        'w_2':w_2,
-        'w_3':w_3,
-        'w_4':w_4
-    }
-
-    zkp_vc1 = user.zkp_vf_cred_1(w, A, m, r_1, r_2, e_u, x_u, x_u_o, s_u, pk_idp, pk_da)
-
-    verify_cred_msg_1 = {
-        'w':w,
-        'A':A,
-        'm':m,
-        'zkp_vc1':zkp_vc1
-    }
-
-    queue_user_ca.put(json.dumps(verify_cred_msg_1))
+    queue_user_ca.put(json.dumps(vc1_out))
 
     #get certificate or false
 
@@ -146,73 +64,52 @@ def idp_demo(queue_user_idp, queue_idp_user, queue_le_idp, queue_idp_le):
     (pk_idp, sk_idp) = constants.init_idp_key()
     constants.publish_pk_idp(pk_idp)
     pk_da = constants.import_pk_da()
-
+#NYM GEN (wait for user to initiate)
     while (queue_user_idp.empty()):
         continue
 
     nym_gen_msg_1 = json.loads(queue_user_idp.get())
-
-    N_1 = nym_gen_msg_1['N_1']
-    C_1 = nym_gen_msg_1['C_1']
-    C_2 = nym_gen_msg_1['C_2']
-    zkp_ng1 = nym_gen_msg_1['zkp_ng1']
     
-    vf_ng1 = idp.verify_zkp_nym_gen_1(C_1, C_2, pk_idp, zkp_ng1)
+    ng2_out = idp.nym_gen_2(nym_gen_msg_1, pk_idp)
 
-    print("vf_ng1 =", vf_ng1)
+    if len(ng2_out) == 0:
+        print ("zkp_ng1 failed")
 
-    #BAD NAMING CONVENTION: should be ng2_out but also happens to be the same message we send
-    nym_gen_msg_2 = idp.nym_gen_2()
-
-    queue_idp_user.put(json.dumps(nym_gen_msg_2))
-
-    N_2 = nym_gen_msg_2['N_2']
-    r = nym_gen_msg_2['r']
-
-    nym = constants.concat(N_1, N_2)
+    queue_idp_user.put(json.dumps(ng2_out))
 
     while(queue_user_idp.empty()):
         continue
     nym_gen_msg_3 = json.loads(queue_user_idp.get())
 
-    P_u = nym_gen_msg_3['P_u']
-    Y_u = nym_gen_msg_3['Y_u']
-    s_tilde = nym_gen_msg_3['s_tilde']
-    C_3 = nym_gen_msg_3['C_3']
-    zkp_ng2 = nym_gen_msg_3['zkp_ng2']
-    zkp_ng3 = nym_gen_msg_3['zkp_ng3']
+    primary_cred_pub = nym_gen_msg_3['pub']
 
-    vf_ng2 = idp.verify_zkp_nym_gen_2(C_1, C_2, C_3, r, P_u, pk_idp, zkp_ng2)
-    vf_ng3 = idp.verify_zkp_nym_gen_3(P_u, Y_u, pk_idp, pk_da, zkp_ng3)
+    #have to add extra checks to make sure we got valid parameters from other person
+    #checks second and third proofs of knowledge
+    vf_ng2 = idp.nym_gen_4(nym_gen_msg_1, ng2_out, nym_gen_msg_3, pk_idp, pk_da)
 
     print("vf_ng2 =", vf_ng2)
-    print("vf_ng3 =", vf_ng3)
 
-    #Store Y_u, P_u, nym
+    #Store primary_cred_pub
 
-
-    #CRED GEN
+#CRED GEN (wait for user to initiate)
 
     #in theory this is a new session, lose all non-stored variables
     while queue_user_idp.empty():
         continue
-    cred_gen_msg_1 = json.loads(queue_user_idp.get())
+    cg1_out = json.loads(queue_user_idp.get())
 
-    nym = cred_gen_msg_1['nym']
-    P_u = cred_gen_msg_1['P_u']
-    zkp_cg1 = cred_gen_msg_1['zkp_cg1']
+    #TASK: primary_cred_pub is in the database
 
-    #VERIFY nym and P_u are in the database
-    vf_cg1 = idp.verify_zkp_cred_gen_1(P_u, pk_idp, zkp_cg1)
+    #sub_cred = cg2_out
+    sub_cred = idp.cred_gen_2(cg1_out, pk_idp, sk_idp)
+    if len(sub_cred) == 0:
+        print("VFCG failed")
+    else:
+        queue_idp_user.put(json.dumps(sub_cred))
 
-    print("vf_cg1 =", vf_cg1)
+    #store sub_cred with primary_cred_pub
 
-    #BAD NAMING CONVENTION: should be cg1_out but also happens to be the same message we send
-    cred_gen_msg_2 = idp.cred_gen_1(P_u, pk_idp, sk_idp)
-    queue_idp_user.put(json.dumps(cred_gen_msg_2))
-
-    #store e_u and c_u with P_u and nym_u
-
+#DEANON
     #wait until law enforcement comes to us
     while queue_le_idp.empty():
         continue
@@ -220,37 +117,32 @@ def idp_demo(queue_user_idp, queue_idp_user, queue_le_idp, queue_idp_le):
     deanon_msg_2 = json.loads(queue_le_idp.get())
     y_hat = deanon_msg_2['y_hat']
 
-    if y_hat == Y_u:
+    if y_hat == primary_cred_pub['Y_u']:
         print("MATCH, FOUND USER")
     else:
         print("NO MATCH, SOMETHINGS WRONG")
+
 def ca_demo(queue_user_ca, queue_ca_user, queue_ca_le):
     pk_idp = constants.import_pk_idp()
     pk_da = constants.import_pk_da()
-
+#VERIFY CRED
     while queue_user_ca.empty():
         continue
-    verify_cred_msg_1 = json.loads(queue_user_ca.get())
+    vc1_out = json.loads(queue_user_ca.get())
     
-    #realistically signed m would be sent at the start
-    w = verify_cred_msg_1['w']
-    A = verify_cred_msg_1['A']
-    m = verify_cred_msg_1['m']
-    zkp_vc1 = verify_cred_msg_1['zkp_vc1']
+    #TASK verify m is valid signed string
 
-    vf_vc1 = ca.verify_zkp_vf_cred_1(w, A, m, zkp_vc1, pk_idp, pk_da)
+    #vc2_out = vf_vc1
+    vf_vc1 = ca.verify_cred_2(vc1_out, pk_idp, pk_da)
     print("vf_vc1 =", vf_vc1)
 
-    #store w and m in case necessary
+    deanon_str = vc1_out['deanon_str']
     #send certificate
+    #deanon_str with serial number of certificate
 
-    #here we would wait for law enforcement to send a certificate then check our database for corresponding w and m
-    deanon_msg_1 = {
-        'w': w,
-        'm':m
-    }
-
-    queue_ca_le.put(json.dumps(deanon_msg_1))
+    #here we would wait for law enforcement to send a certificate then check our database for corresponding deanon_str
+    
+    queue_ca_le.put(json.dumps(deanon_str))
 
 def le_demo(queue_ca_le, queue_le_idp, queue_idp_le, queue_le_da, queue_da_le):
     while queue_ca_le.empty():
@@ -277,17 +169,10 @@ def da_demo(queue_le_da, queue_da_le):
 
     deanon_msg_1 = json.loads(queue_le_da.get())
 
-    w = deanon_msg_1['w']
-    m = deanon_msg_1['m']
+    y_hat = da.deanon(deanon_msg_1, pk_da, sk_da)
 
-    is_valid = da.deanon_1(w, m, pk_da, sk_da)
-
-    print("is_valid =", is_valid)
-
-    w_1 = w['w_1']
-    w_3 = w['w_3']
-
-    y_hat = da.deanon_2(w_1, w_3, pk_da, sk_da)
+    if (y_hat < 0):
+        print ("deanon check failed")
 
     deanon_msg_2 = {
         'y_hat': y_hat
