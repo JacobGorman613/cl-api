@@ -49,6 +49,10 @@ def clear_keys():
         os.remove(PK_IDP_PATH)
     if exists(PK_DA_PATH):
         os.remove(PK_DA_PATH)
+    while exists(PK_IDP_PATH):
+        continue
+    while exists(PK_DA_PATH):
+        continue
 
 
 def rand_safe_prime(length):

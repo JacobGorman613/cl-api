@@ -11,3 +11,4 @@ TODO:
 	- handle cases where tests fail in demo
 	- improve the last diagram in diagrams
 		- it was rushedto finish before a meeting and is highly informal
+	- update idp to hold state (session_id) and deal with multiple users at once
