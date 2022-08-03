@@ -9,7 +9,7 @@ from multiprocessing import Queue
 
 import json
 
-def user_demo(queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user):
+def user_demo(user_queue, idp_queue, ca_queue):
     x_u = constants.init_user_key()
     pk_idp = constants.import_pk_idp()
     pk_da = constants.import_pk_da()
@@ -17,11 +17,11 @@ def user_demo(queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user):
 #NYM GEN
     ng1_out = user.nym_gen_1(x_u, pk_idp)
 
-    queue_user_idp.put(json.dumps(ng1_out['send']))
+    idp_queue.put(json.dumps(ng1_out['send']))
 
-    while queue_idp_user.empty():
+    while user_queue.empty():
         continue
-    nym_gen_msg_2 = json.loads(queue_idp_user.get())
+    nym_gen_msg_2 = json.loads(user_queue.get())
 
     ng3_out = user.nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da)
 
@@ -29,20 +29,20 @@ def user_demo(queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user):
 
     nym_gen_msg_3 = ng3_out['send']
 
-    queue_user_idp.put(json.dumps(nym_gen_msg_3))
+    idp_queue.put(json.dumps(nym_gen_msg_3))
 
     #STORE primary_cred
 
 #CRED GEN
     cg1_out = user.cred_gen_1(x_u, primary_cred, pk_idp)
 
-    queue_user_idp.put(json.dumps(cg1_out))
+    idp_queue.put(json.dumps(cg1_out))
 
-    while queue_idp_user.empty():
+    while user_queue.empty():
         continue
 
     #sub_cred = cred_gen_msg_2
-    sub_cred = json.loads(queue_idp_user.get())
+    sub_cred = json.loads(user_queue.get())
 
     cred_record_correct = user.cred_gen_3(primary_cred, sub_cred, pk_idp)
 
@@ -55,31 +55,31 @@ def user_demo(queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user):
 
     vc1_out = user.verify_cred_1(x_u, primary_cred, sub_cred, m, pk_idp, pk_da)
 
-    queue_user_ca.put(json.dumps(vc1_out))
+    ca_queue.put(json.dumps(vc1_out))
 
     #get certificate or false
 
-def idp_demo(queue_user_idp, queue_idp_user, queue_le_idp, queue_idp_le):
+def idp_demo(idp_queue, user_queue, le_queue):
     #initialize and sk/pk, publish pk
     (pk_idp, sk_idp) = constants.init_idp_key()
     constants.publish_pk_idp(pk_idp)
     pk_da = constants.import_pk_da()
 #NYM GEN (wait for user to initiate)
-    while (queue_user_idp.empty()):
+    while (idp_queue.empty()):
         continue
 
-    nym_gen_msg_1 = json.loads(queue_user_idp.get())
+    nym_gen_msg_1 = json.loads(idp_queue.get())
     
     ng2_out = idp.nym_gen_2(nym_gen_msg_1, pk_idp)
 
     if len(ng2_out) == 0:
         print ("zkp_ng1 failed")
 
-    queue_idp_user.put(json.dumps(ng2_out))
+    user_queue.put(json.dumps(ng2_out))
 
-    while(queue_user_idp.empty()):
+    while(idp_queue.empty()):
         continue
-    nym_gen_msg_3 = json.loads(queue_user_idp.get())
+    nym_gen_msg_3 = json.loads(idp_queue.get())
 
     primary_cred_pub = nym_gen_msg_3['pub']
 
@@ -94,9 +94,9 @@ def idp_demo(queue_user_idp, queue_idp_user, queue_le_idp, queue_idp_le):
 #CRED GEN (wait for user to initiate)
 
     #in theory this is a new session, lose all non-stored variables
-    while queue_user_idp.empty():
+    while idp_queue.empty():
         continue
-    cg1_out = json.loads(queue_user_idp.get())
+    cg1_out = json.loads(idp_queue.get())
 
     #TASK: primary_cred_pub is in the database
 
@@ -105,16 +105,16 @@ def idp_demo(queue_user_idp, queue_idp_user, queue_le_idp, queue_idp_le):
     if len(sub_cred) == 0:
         print("VFCG failed")
     else:
-        queue_idp_user.put(json.dumps(sub_cred))
+        user_queue.put(json.dumps(sub_cred))
 
     #store sub_cred with primary_cred_pub
 
 #DEANON
     #wait until law enforcement comes to us
-    while queue_le_idp.empty():
+    while idp_queue.empty():
         continue
 
-    deanon_msg_2 = json.loads(queue_le_idp.get())
+    deanon_msg_2 = json.loads(idp_queue.get())
     y_hat = deanon_msg_2['y_hat']
 
     if y_hat == primary_cred_pub['Y_u']:
@@ -122,13 +122,13 @@ def idp_demo(queue_user_idp, queue_idp_user, queue_le_idp, queue_idp_le):
     else:
         print("NO MATCH, SOMETHINGS WRONG")
 
-def ca_demo(queue_user_ca, queue_ca_user, queue_ca_le):
+def ca_demo(ca_queue, user_queue, le_queue):
     pk_idp = constants.import_pk_idp()
     pk_da = constants.import_pk_da()
 #VERIFY CRED
-    while queue_user_ca.empty():
+    while ca_queue.empty():
         continue
-    vc1_out = json.loads(queue_user_ca.get())
+    vc1_out = json.loads(ca_queue.get())
     
     #TASK verify m is valid signed string
 
@@ -142,32 +142,17 @@ def ca_demo(queue_user_ca, queue_ca_user, queue_ca_le):
 
     #here we would wait for law enforcement to send a certificate then check our database for corresponding deanon_str
     
-    queue_ca_le.put(json.dumps(deanon_str))
-
-def le_demo(queue_ca_le, queue_le_idp, queue_idp_le, queue_le_da, queue_da_le):
-    while queue_ca_le.empty():
-        continue
+    le_queue.put(json.dumps(deanon_str))
     
-    deanon_msg_1 = json.loads(queue_ca_le.get())
-    #i guess there's no real reason to un-json/re-json the string    
-    queue_le_da.put(json.dumps(deanon_msg_1))
-
-    while queue_da_le.empty():
-        continue
-
-    deanon_msg_2 = json.loads(queue_da_le.get())
-    #i guess there's no real reason to un-json/re-json the string
-    queue_le_idp.put(json.dumps(deanon_msg_2))
-    
-def da_demo(queue_le_da, queue_da_le):
+def da_demo(da_queue, le_queue):
     #initialize and publish keys
     (pk_da, sk_da) = constants.init_da_key()
     constants.publish_pk_da(pk_da)
 
-    while(queue_le_da.empty()):
+    while(da_queue.empty()):
         continue
 
-    deanon_msg_1 = json.loads(queue_le_da.get())
+    deanon_msg_1 = json.loads(da_queue.get())
 
     y_hat = da.deanon(deanon_msg_1, pk_da, sk_da)
 
@@ -178,31 +163,40 @@ def da_demo(queue_le_da, queue_da_le):
         'y_hat': y_hat
     }
 
-    queue_da_le.put(json.dumps(deanon_msg_2))
+    le_queue.put(json.dumps(deanon_msg_2))
+
+def le_demo(le_queue, idp_queue, ca_queue, da_queue):
+    while le_queue.empty():
+        continue
+    
+    deanon_msg_1 = json.loads(le_queue.get())
+    #i guess there's no real reason to un-json/re-json the string    
+    da_queue.put(json.dumps(deanon_msg_1))
+
+    while le_queue.empty():
+        continue
+
+    deanon_msg_2 = json.loads(le_queue.get())
+    #i guess there's no real reason to un-json/re-json the string
+    idp_queue.put(json.dumps(deanon_msg_2))
 
 def main():
     #if we dont clear the keys then user/ca read old keys and everything breaks
     constants.clear_keys()
 
-    queue_user_idp = Queue() #for user to send stuff to idp
-    queue_idp_user = Queue() #for idp to send stuff to user
-    
-    queue_user_ca = Queue()  #for user to send stuff to ca
-    queue_ca_user = Queue()  #for ca to send stuff to user
-    
-    queue_ca_le = Queue()
+    # queues for each process to receive messages
+    # note queues are threadsafe
+    user_queue = Queue()
+    idp_queue = Queue()
+    ca_queue = Queue()
+    da_queue = Queue()
+    le_queue = Queue()
 
-    queue_le_idp = Queue()
-    queue_idp_le = Queue()
-
-    queue_le_da = Queue()
-    queue_da_le = Queue()
-
-    user_thread = Thread(target = user_demo, args = (queue_user_idp, queue_idp_user, queue_user_ca, queue_ca_user, ))
-    idp_thread = Thread(target = idp_demo, args = (queue_user_idp, queue_idp_user, queue_le_idp, queue_idp_le, ))
-    ca_thread = Thread(target = ca_demo, args = (queue_user_ca, queue_ca_user, queue_ca_le, ))
-    da_thread = Thread(target = da_demo, args = (queue_le_da, queue_da_le, ))
-    le_thread = Thread(target = le_demo, args = (queue_ca_le, queue_le_idp, queue_idp_le, queue_le_da, queue_da_le, ))
+    user_thread = Thread(target = user_demo, args = (user_queue, idp_queue, ca_queue, ))
+    idp_thread = Thread(target = idp_demo, args = (idp_queue, user_queue, le_queue, ))
+    ca_thread = Thread(target = ca_demo, args = (ca_queue, user_queue, le_queue, ))
+    da_thread = Thread(target = da_demo, args = (da_queue, le_queue, ))
+    le_thread = Thread(target = le_demo, args = (le_queue, idp_queue, ca_queue, da_queue, ))
 
     user_thread.start()
     idp_thread.start()
