@@ -6,7 +6,7 @@ import zkp
 #nym_gen
 
 
-def nym_gen_1(x_u, pk_idp):    
+def nym_gen_1(x_u, session_id, pk_idp):    
     g = pk_idp['g']
     h = pk_idp['h']
     n = pk_idp['n']
@@ -22,7 +22,7 @@ def nym_gen_1(x_u, pk_idp):
     pub = {
         'N_1' : N_1,    
         'C_1' : C_1,    
-        'C_2' : C_2         
+        'C_2' : C_2
     }
 
     priv = {
@@ -33,24 +33,35 @@ def nym_gen_1(x_u, pk_idp):
 
     zkp_ng1 = zkp.zkp_nym_gen_1(x_u, pub, priv , pk_idp)
 
-    send = {
+    data = {
         'pub':pub,
-        'zkp_ng1': zkp_ng1
+        'zkp_ng1': zkp_ng1,
+        'id' : session_id
     }
+
+    send = {
+        'data':data,
+        'type':'ng1',
+        'id' : session_id
+    }
+
+    #TODO CLEAN THIS UP types are weird
 
     ng1_out = {
         'priv' : priv,
         'send' : send
     }
+#    print ("Returning ng1_out")
+#    print(ng1_out)
 
     return ng1_out
 
 
    
 def nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da):
-    N_1 = ng1_out['send']['pub']['N_1']
-    C_1 = ng1_out['send']['pub']['C_1']
-    C_2 = ng1_out['send']['pub']['C_2']
+    N_1 = ng1_out['send']['data']['pub']['N_1']
+    C_1 = ng1_out['send']['data']['pub']['C_1']
+    C_2 = ng1_out['send']['data']['pub']['C_2']
     
     r_1 = ng1_out['priv']['r_1']
     r_2 = ng1_out['priv']['r_2']
@@ -123,14 +134,20 @@ def nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da):
 
     zkp_ng3 = zkp.zkp_nym_gen_3(x_u, primary_cred, pk_idp, pk_da)
 
-    send = {
+    data = {
         'pub':pub,
         'R':R,
         'C':C,
         's_tilde':s_tilde,
         'zkp_ng2':zkp_ng2,
-        'zkp_ng3':zkp_ng3
+        'zkp_ng3':zkp_ng3,
+        'id' : ng1_out['send']['data']['id']
+    }
 
+    send = {
+        'data':data,
+        'type':'ng3',
+        'id': ng1_out['send']['data']['id']
     }
 
     # technically space inefficient bc pub stored twice but makes our lives sooo much easier
@@ -143,13 +160,19 @@ def nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da):
 
 #cred_gen
 
-def cred_gen_1(x_u, primary_cred, pk_idp):
+def cred_gen_1(x_u, primary_cred, pk_idp, session_id):
     
     zkp_cg1 = zkp.zkp_cred_gen_1(x_u, primary_cred, pk_idp)
 
-    cg1_out = {
+    data = {
         'zkp_cg1' : zkp_cg1,
         'pub' : primary_cred['pub']
+    }
+
+    cg1_out = {
+        'type':'cg1',
+        'data':data,
+        'id': session_id
     }
 
     return cg1_out
@@ -172,7 +195,7 @@ def cred_gen_3(primary_cred, sub_cred, pk_idp):
 
 
 
-def verify_cred_1(x_u, primary_cred, sub_cred, m, pk_idp, pk_da):
+def verify_cred_1(x_u, primary_cred, sub_cred, m, pk_idp, pk_da, session_id):
     Y_u = primary_cred['pub']['Y_u']
 
     c_u = sub_cred['c_u']
@@ -215,10 +238,16 @@ def verify_cred_1(x_u, primary_cred, sub_cred, m, pk_idp, pk_da):
         'm' : m
     }
 
-    vc1_out = {
+    data = {
         'A':A,
         'deanon_str' : deanon_str,
         'zkp_vc1':zkp_vc1
+    }
+
+    vc1_out = {
+        'data' : data,
+        'type' : 'vc1',
+        'id' : session_id
     }
 
     return vc1_out

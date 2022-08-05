@@ -11,6 +11,7 @@ ELL_DELTA = 128
 ELL_LAMBDA = 128
 ELL_K = 128
 EPSILON = 2
+ID_LENGTH = 256
 
 PK_IDP_PATH = "pk_idp.json"
 PK_DA_PATH = "pk_da.json"
