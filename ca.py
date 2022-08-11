@@ -1,5 +1,5 @@
 import zkp
-from datetime import datetime
+import time
 
 def verify_cred_2(vc1_out, pk_idp, pk_da):
     return zkp.verify_zkp_vf_cred_1(vc1_out, pk_idp, pk_da)
@@ -42,10 +42,16 @@ def schedule_ca(msg, keys, data = None):
                         'proof_of_validity':data['proof_of_validity']
                     }
                 },
-                'id' : msg['id']
+                'send_id' : msg['id']
             }
 
             return out
     else:
         #TODO put real error handling here
         print("Invalid message type")
+
+def init_keys_dict(pk_idp, pk_da):
+    return {
+        'pk_idp': pk_idp,
+        'pk_da' : pk_da 
+    }

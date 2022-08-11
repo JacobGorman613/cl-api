@@ -102,7 +102,7 @@ def reparam_verify_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_
     return True
 
 def verify_zkp_nym_gen_2(primary_cred_pub, C_1, C_2, C_3, r, pk_idp, zkp_ng2):
-    P_u = primary_cred_pub['P_u']
+    p_u = primary_cred_pub['p_u']
 
     n = pk_idp['n']
     
@@ -121,9 +121,9 @@ def verify_zkp_nym_gen_2(primary_cred_pub, C_1, C_2, C_3, r, pk_idp, zkp_ng2):
     y_1 = pow(C_1, 2, n)
     y_2 = pow(C_2, 2, n)
     y_3 = pow(C_3, 2, n)
-    #nested pow can probably be one with a negative exponent but idk if negative powers work in general or just for modular inverse
+    # nested pow can probably be one with a negative exponent but idk if negative powers work in general or just for modular inverse
     y_4 = (y_1 * pow(g_1, (r - (1 << constants.ELL_DELTA) + 1), n)) * pow(pow(y_3, (1 << (constants.ELL_DELTA + 1)) - 1, n), -1, n) % n
-    y_5 = pow(P_u, 2, n)
+    y_5 = pow(p_u, 2, n)
 
     return reparam_verify_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, n, zkp_ng2)
 
@@ -155,8 +155,8 @@ def reparam_verify_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h_1, n, p_d, zkp_ng3):
     return True
 
 def verify_zkp_nym_gen_3(primary_cred_pub, pk_idp, pk_da, zkp_ng3):
-    P_u = primary_cred_pub['P_u']
-    Y_u = primary_cred_pub['Y_u']
+    p_u = primary_cred_pub['p_u']
+    y_u = primary_cred_pub['y_u']
 
     n = pk_idp['n']
     a = pk_idp['a']
@@ -166,8 +166,8 @@ def verify_zkp_nym_gen_3(primary_cred_pub, pk_idp, pk_da, zkp_ng3):
     p_d = pk_da['p_d']
     g_d = pk_da['g_d']
 
-    y_1 = pow(P_u, 2, n)
-    y_2 = Y_u
+    y_1 = pow(p_u, 2, n)
+    y_2 = y_u
     
     g_1 = pow(a, 2, n)
     g_2 = pow(b, 2, n)
@@ -204,7 +204,7 @@ def reparam_verify_zkp_cred_gen_1(y_1, g_1, g_2, g_3, n, zkp_cg1):
     return True
 
 def verify_zkp_cred_gen_1(cred_gen_msg_1, pk_idp):
-    P_u = cred_gen_msg_1['pub']['P_u']
+    p_u = cred_gen_msg_1['pub']['p_u']
     zkp_cg1 = cred_gen_msg_1['zkp_cg1']
 
     n = pk_idp['n']
@@ -212,7 +212,7 @@ def verify_zkp_cred_gen_1(cred_gen_msg_1, pk_idp):
     b = pk_idp['b']
     v = pk_idp['v']
 
-    y_1 = pow(P_u, 2, n)
+    y_1 = pow(p_u, 2, n)
     
     g_1 = pow(a, 2, n)
     g_2 = pow(b, 2, n)
@@ -438,7 +438,7 @@ def reparam_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_5, a_1,
     return zkp
 
 def zkp_nym_gen_2(x_u, primary_cred, C, R, s_tilde, pk_idp):
-    P_u = primary_cred['pub']['P_u']
+    p_u = primary_cred['pub']['p_u']
     s_u = primary_cred['priv']['s_u']
     x_u_o = primary_cred['priv']['x_u_o']
 
@@ -470,7 +470,7 @@ def zkp_nym_gen_2(x_u, primary_cred, C, R, s_tilde, pk_idp):
     y_2 = pow(C_2, 2, n)
     y_3 = pow(C_3, 2, n)
     y_4 = y_1 * pow(g_1, r - (1 << constants.ELL_DELTA) + 1, n) * pow(y_3, -((1 << (constants.ELL_DELTA + 1)) - 1), n) % n
-    y_5 = pow(P_u, 2, n)
+    y_5 = pow(p_u, 2, n)
         
     a_1 = r_1
     a_2 = r_2
@@ -520,8 +520,8 @@ def reparam_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h_1, a_1, a_2, a_3, n, p_d):
     return zkp
 
 def zkp_nym_gen_3(x_u, primary_cred, pk_idp, pk_da):
-    P_u = primary_cred['pub']['P_u']
-    Y_u = primary_cred['pub']['Y_u']
+    p_u = primary_cred['pub']['p_u']
+    y_u = primary_cred['pub']['y_u']
     s_u = primary_cred['priv']['s_u']
     x_u_o = primary_cred['priv']['x_u_o']
     
@@ -533,8 +533,8 @@ def zkp_nym_gen_3(x_u, primary_cred, pk_idp, pk_da):
     p_d = pk_da['p_d']
     g_d = pk_da['g_d']
 
-    y_1 = pow(P_u, 2, n)
-    y_2 = Y_u
+    y_1 = pow(p_u, 2, n)
+    y_2 = y_u
     
     g_1 = pow(a, 2, n)
     g_2 = pow(b, 2, n)
@@ -583,8 +583,8 @@ def reparam_zkp_cred_gen_1(y_1, g_1, g_2, g_3, a_1, a_2, a_3, n):
     return zkp
 
 def zkp_cred_gen_1(x_u, primary_cred, pk_idp):
-    P_u = primary_cred['pub']['P_u']
-    Y_u = primary_cred['pub']['Y_u']
+    p_u = primary_cred['pub']['p_u']
+    y_u = primary_cred['pub']['y_u']
     s_u = primary_cred['priv']['s_u']
     x_u_o = primary_cred['priv']['x_u_o']    
 
@@ -593,7 +593,7 @@ def zkp_cred_gen_1(x_u, primary_cred, pk_idp):
     b = pk_idp['b']
     v = pk_idp['v']
 
-    y_1 = pow(P_u, 2, n)
+    y_1 = pow(p_u, 2, n)
     
     g_1 = pow(a, 2, n)
     g_2 = pow(b, 2, n)

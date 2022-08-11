@@ -6,7 +6,10 @@ import zkp
 #nym_gen
 
 
-def nym_gen_1(x_u, session_id, pk_idp):    
+def nym_gen_1(session_id, keys):    
+    pk_idp = keys['pk_idp']
+    x_u = keys['x_u']
+
     g = pk_idp['g']
     h = pk_idp['h']
     n = pk_idp['n']
@@ -58,7 +61,11 @@ def nym_gen_1(x_u, session_id, pk_idp):
 
 
    
-def nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da):
+def nym_gen_3(ng1_out, nym_gen_msg_2, keys):
+    x_u = keys['x_u']
+    pk_idp = keys['pk_idp']
+    pk_da = keys['pk_da']
+
     N_1 = ng1_out['send']['data']['pub']['N_1']
     C_1 = ng1_out['send']['data']['pub']['C_1']
     C_2 = ng1_out['send']['data']['pub']['C_2']
@@ -92,10 +99,10 @@ def nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da):
     if not check == s_u:
         s_u += 1
     
-    P_u = pow(a, x_u, n) * pow(b, s_u, n) * pow(v, x_u_o, n) % n
+    p_u = pow(a, x_u, n) * pow(b, s_u, n) * pow(v, x_u_o, n) % n
     C_3 = pow(g, s_tilde, n) * pow(h, r_4, n) % n
 
-    Y_u = pow(g_d, x_u, p_d)
+    y_u = pow(g_d, x_u, p_d)
 
     nym = constants.concat(N_1, N_2)
 
@@ -115,8 +122,8 @@ def nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da):
 
     # part of primary credential shared with IDP
     pub = {
-        'P_u' : P_u,
-        'Y_u' : Y_u,
+        'p_u' : p_u,
+        'y_u' : y_u,
         'nym' : nym
     }
     # private part of primary credential
@@ -160,7 +167,9 @@ def nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da):
 
 #cred_gen
 
-def cred_gen_1(x_u, primary_cred, pk_idp, session_id):
+def cred_gen_1(primary_cred, session_id, keys):
+    x_u = keys['x_u']
+    pk_idp = keys['pk_idp']
     
     zkp_cg1 = zkp.zkp_cred_gen_1(x_u, primary_cred, pk_idp)
 
@@ -177,8 +186,10 @@ def cred_gen_1(x_u, primary_cred, pk_idp, session_id):
 
     return cg1_out
 
-def cred_gen_3(primary_cred, sub_cred, pk_idp):
-    P_u = primary_cred['pub']['P_u']
+def cred_gen_3(primary_cred, sub_cred, keys):
+    pk_idp = keys['pk_idp']
+
+    p_u = primary_cred['pub']['p_u']
 
     e_u = sub_cred['e_u']
     c_u = sub_cred['c_u']    
@@ -187,7 +198,7 @@ def cred_gen_3(primary_cred, sub_cred, pk_idp):
     n = pk_idp['n']
 
     lhs = pow(c_u, e_u, n)
-    rhs = (P_u * d) % n
+    rhs = (p_u * d) % n
 
     return lhs == rhs
 
@@ -195,8 +206,12 @@ def cred_gen_3(primary_cred, sub_cred, pk_idp):
 
 
 
-def verify_cred_1(x_u, primary_cred, sub_cred, m, pk_idp, pk_da, session_id):
-    Y_u = primary_cred['pub']['Y_u']
+def verify_cred_1(primary_cred, sub_cred, m, session_id, keys):
+    x_u = keys['x_u']
+    pk_idp = keys['pk_idp']
+    pk_da = keys['pk_da']
+
+    y_u = primary_cred['pub']['y_u']
 
     c_u = sub_cred['c_u']
 
@@ -215,7 +230,7 @@ def verify_cred_1(x_u, primary_cred, sub_cred, m, pk_idp, pk_da, session_id):
 
     w_1 = pow(g_d, r_1, p_d)
     w_2 = pow(h_d, r_1, p_d)
-    w_3 = pow(z_3, r_1, p_d) * Y_u % p_d
+    w_3 = pow(z_3, r_1, p_d) * y_u % p_d
 
     c = constants.hash_str(w_1, w_2, w_3, m)
 
@@ -251,3 +266,10 @@ def verify_cred_1(x_u, primary_cred, sub_cred, m, pk_idp, pk_da, session_id):
     }
 
     return vc1_out
+
+def init_keys_dict(x_u, pk_idp, pk_da):
+    return {
+        'x_u' : x_u,
+        'pk_idp' : pk_idp,
+        'pk_da' : pk_da
+    }

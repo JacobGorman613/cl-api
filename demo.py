@@ -13,21 +13,29 @@ from threading import Thread
 from multiprocessing import Queue
 
 def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
-    #initialize/import all necessary keys
+
+
+    # initialize/import all necessary keys
     x_u = constants.init_user_key()
     pk_idp = constants.import_pk_idp()
     pk_da = constants.import_pk_da()
+
+    keys = user.init_keys_dict(x_u, pk_idp, pk_da)
     
-    #this may not be a great assumption to make but assuming for now proof of identity can be encoded as a json
+    # this may not be a great assumption to make but assuming for now proof of identity can be encoded as a string
     id_u = "this string contains definitive proof that I am thread " + str(threadno)
 
 
-    #PROTOCOL: NYM_GEN
+    # PROTOCOL: NYM_GEN
 
-    #DIFF use random 256 bit session_id instead. 
-    #   here we do it deterministically because we can assume no cheating 
-    #   and no collision and it makes keeping track of user_queues easier
+    
+    # send initial message w/ proof of identity and randomly generated session id
+    # NOTE we really will use a random 256 bit string but using threadno + NUM_USERS*i for the ith call lets us makes debugging far easier 
+    # also allows for indexing into an array of queues based on session_id % NUM_USERS without worrying about collision
 
+    # session_id_nym_gen = secrets.randbits(constants.ID_LENGTH)
+
+    #note each protocol (nym gen, cred gen, cred vf) have their own session id
     session_id_nym_gen = threadno
 
     msg_init = {
@@ -43,15 +51,13 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
     if init_response != 'success':
         print("failed to verify identity")
 
-    ng1_out = user.nym_gen_1(x_u, session_id_nym_gen, pk_idp)
+    ng1_out = user.nym_gen_1(session_id_nym_gen, keys)
 
     idp_queue.put(json.dumps(ng1_out['send']))
 
-    while user_queue.empty():
-        time.sleep(1)
     nym_gen_msg_2 = json.loads(user_queue.get())
 
-    ng3_out = user.nym_gen_3(x_u, ng1_out, nym_gen_msg_2, pk_idp, pk_da)
+    ng3_out = user.nym_gen_3(ng1_out, nym_gen_msg_2, keys)
 
     primary_cred = ng3_out['primary_cred']
 
@@ -59,231 +65,238 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
 
     idp_queue.put(json.dumps(nym_gen_msg_3))
 
-    while user_queue.empty():
-        time.sleep(1)
-
     nym_response = json.loads(user_queue.get())
 
     if nym_response != 'success':
         print("failed to obtain primary credential")
     
-    #STORE primary_cred
+    # STORE primary_cred
     
-    #PROTOCOL: CRED_GEN
+    # PROTOCOL: CRED_GEN
 
-    #new unique id for cred gen (should use random)
+    # new unique id for cred gen (should use random)
     session_id_cred_gen = NUM_USERS + threadno
 
-    cg1_out = user.cred_gen_1(x_u, primary_cred, pk_idp, session_id_cred_gen)
+    cg1_out = user.cred_gen_1(primary_cred, session_id_cred_gen, keys)
 
     idp_queue.put(json.dumps(cg1_out))
 
-    while user_queue.empty():
-        time.sleep(1)
-
     sub_cred = json.loads(user_queue.get())
 
-    cred_record_correct = user.cred_gen_3(primary_cred, sub_cred, pk_idp)
+    cred_record_correct = user.cred_gen_3(primary_cred, sub_cred, keys)
 
     if not cred_record_correct:
         print("failure creating subcredential")
     
-    #TASK store sub_cred
+    # TASK store sub_cred
 
     idp_queue.put(json.dumps('done'))
     
-    #PROTOCOL: VERIFY_CRED
+    # PROTOCOL: VERIFY_CRED
     session_id_verify_cred = 2 * NUM_USERS + threadno
 
     m = "i agree not to post ncp or you can deanonymize me"
 
-    vc1_out = user.verify_cred_1(x_u, primary_cred, sub_cred, m, pk_idp, pk_da, session_id_verify_cred)
+    vc1_out = user.verify_cred_1(primary_cred, sub_cred, m, session_id_verify_cred, keys)
 
     ca_queue.put(json.dumps(vc1_out))
 
-    #get certificate or false
-    #for now we don't get rejection message so if we get anything then its a certificate
-    #TODO fix so that there's an error message
+    # get certificate or error message
     certificate = json.loads(user_queue.get())
-    le_queue.put(certificate['cert_id'])
 
+    if certificate == 'failure':
+        print("user thread {} failed to verify subcredential".format(threadno))
     ca_queue.put(json.dumps('done'))
 
+    #send LE our certificate ID for when they choose a random user to flag
+    le_queue.put(certificate['cert_id'])
+
+
 def idp_demo(idp_queue, user_queues, le_queue):
-    #initialize/import all necessary keys
+    # initialize/import all necessary keys
     (pk_idp, sk_idp) = constants.init_idp_key()
     constants.publish_pk_idp(pk_idp)
     pk_da = constants.import_pk_da()
 
-    #store keys as one element. Is this realistic? Could we import all the keys as one thing through PKI?
-    #otherwise make separate args for each which makes users life harder
-    keys = {
-        'pk_idp': pk_idp,
-        'sk_idp': sk_idp,
-        'pk_da': pk_da
-    }
+    # store keys as a single dict since certain calls need different keys
+    keys = idp.init_keys_dict(pk_idp, sk_idp, pk_da)
 
-    #represents persistent data
-    database = {
+    # represents a cache, dict of dicts
+    idp_buffer = idp.init_idp_buffer()
+
+
+    # represents persistent data
+    # store one table with primary creds,
+    # keep a databse w/ primary_cred table and sub_cred table
+    # both are indexed to by nym
+    idp_db = {
         'primary_cred' : {},
         'sub_cred' : {}
-
-    }
-
-    #represents a cache
-    buffer = {
-        'primary_creds' : {},
-        'ng1_datas' : {},
-        'ng2_datas' : {},
-        'ng3_datas' : {},
-        'sub_creds' : {},
-        'user_ids' : {}
     }
 
     done = False
 
-    #loop until all users and DA have sent 'done' messages
+    # loop until all users and DA have sent 'done' messages
     num_finished = 0
 
     while not done:
-        #wait until we receive a message
-        while (idp_queue.empty()):
-            time.sleep(1)
+        # wait until we receive a message
         msg = json.loads(idp_queue.get())
 
         if msg == 'done':
             num_finished += 1
-            #wait for le to finish too
+            # wait for all users and LE to finish
             if num_finished == NUM_USERS + 1:
                 done = True
-                print("idp done")
         elif msg['type'] == 'deanon':
-            #DEANON HANDLED SEPARATELY SINCE INFREQUENT AND HIGHLY IMPORTANT
-            #TASK verify all legal stuff
+            # DEANON HANDLED SEPARATELY SINCE INFREQUENT AND HIGHLY IMPORTANT
+            # TASK verify all legal stuff (msg['data']['legal'])
 
-            y_hat = msg['data']
+            y_hat = msg['data']['y_hat']
             perp_id = -1
 
-            for user in database['primary_cred'].values():
-                if user['Y_u'] == y_hat:
+            #search through primary cred database table for user w/ user['y_u'] == y_hat
+            for user in idp_db['primary_cred'].values():
+                if user['y_u'] == y_hat:
                     perp_id = user['id']
                     break
 
             le_queue.put(json.dumps(perp_id))
         else:
-            out = idp.schedule_idp(msg, buffer, keys)
+            out = idp.schedule_idp(msg, idp_buffer, keys)
             if 'load' in out:
                 key = out['load']
                 load_type = out['load_type']
-                if key in database[load_type]:
-                    out = idp.schedule_idp(msg, buffer, keys, database[load_type][key])
+                if key in idp_db[load_type]:
+                    out = idp.schedule_idp(msg, idp_buffer, keys, idp_db[load_type][key])
                 else:
-                    #TODO real error handling
+                    # TODO real error handling
                     print ("failed to find {} in database".format(key))
             if 'send' in out:
-                #send result to user with correct id
-                user_queues[msg['id'] % NUM_USERS].put(json.dumps(out['send']))
+                # user_queues should actually be a map of session_id -> ip address but
+                # array of queues is how demo keeps track of which user we are responding to
+
+                # send result to user with correct id
+                user_queues[out['send_id'] % NUM_USERS].put(json.dumps(out['send']))
 
             if 'store' in out:
                 key = out['store']['key']
                 cred_type = out['store']['cred_type']
                 value = out['store']['value']
-                database[cred_type][key] = value
+                idp_db[cred_type][key] = value
+
+    print("idp done")
 
 
 def ca_demo(ca_queue, user_queues, le_queue):
     pk_idp = constants.import_pk_idp()
     pk_da = constants.import_pk_da()
 
-    keys = {
-        'pk_idp': pk_idp,
-        'pk_da' : pk_da 
-    }
+    keys = ca.init_keys_dict(pk_idp, pk_da)
 
-    database = {}
+    ca_db = {}
 
     num_finished = 0
 
     done = False
 
-    #loop until all users and le have sent 'done' messages
+    # loop until all users and le have sent 'done' messages
     while not done:
 
-        while ca_queue.empty():
-            time.sleep(1)
-        
         msg = json.loads(ca_queue.get())
 
         if msg == 'done':
             num_finished += 1
-            #wait for le to finish too
+            # wait for all users and LE to finish
             if num_finished == NUM_USERS + 1:
-                print("ca done")
                 done = True
         elif msg['type'] == 'deanon':
-            #DEANON HANDLED SEPARATELY FROM MAIN CASE FOR CONTROL FLOW REASONS AND BECAUSE ACTUAL PROCESS OUTSIDE API
-            certificate_id = msg['data']
-            deanon_str = database[certificate_id]['deanon_str']
-            #print("deanon = ", json.dumps(deanon_str, indent = 4))
+            # DEANON HANDLED SEPARATELY FROM MAIN CASE FOR CONTROL FLOW REASONS AND BECAUSE ACTUAL PROCESS OUTSIDE API
+            # TASK: verify all legal paperwork (msg['data']['legal'])
+            certificate_id = msg['data']['cert_id']
+            deanon_str = ""
+            try:
+                deanon_str = ca_db[certificate_id]['deanon_str']
+            except KeyError:
+                continue    
             le_queue.put(json.dumps(deanon_str))
         else:
+            # if not a deanon message or done message, call the scheduler
             out = ca.schedule_ca(msg, keys)
 
+            # use the output of the scheduler to decide what to do
+
+            # if 'cert' in out then we have verified users subcredential and need to send them a certificate
             if 'cert' in out:
-                #TASK get a certificate and cert_id
+                # TASK get a certificate and cert_id
 
                 certificate = {
                     'cert' : secrets.randbits(64),
                     'cert_id' : secrets.randbits(64),
                     'proof_of_validity' : out['cert']
                 }
+
+                #additional call to schedule_ca to configure out to be good for 'send' and 'store'
                 out = ca.schedule_ca(msg, keys, certificate)
 
+            # if out has a send parameter send out['send'] to out['send_id']
             if 'send' in out:
-                #TODO pick right queue based on out['send_id']
-                user_queues[msg['id'] % NUM_USERS].put(json.dumps(out['send']))
+                # TASK choose correct connection based on out['send_id']
+                user_queues[out['send_id'] % NUM_USERS].put(json.dumps(out['send']))
 
+            # if out has a 'store' parameter, store in our database
             if 'store' in out:
                 key = out['store']['key']
                 value = out['store']['value']
-                database[key] = value
+                #TASK replace this with real database access
+                ca_db[key] = value
+    
+    print("ca done")
             
     
 def da_demo(da_queue, le_queue):
-    #initialize and publish keys
+    # initialize and publish keys
     (pk_da, sk_da) = constants.init_da_key()
     constants.publish_pk_da(pk_da)
 
     done = False
 
-    #loop until LE sends done
+    # loop until LE sends done
     while not done:
-        while(da_queue.empty()):
-            time.sleep(1)
-
         msg = json.loads(da_queue.get())
 
-        #templating is dumb here but works
+        # templating is dumb here but works
+        #in a real demo deanon is the only kind of message da should be getting
         if msg == 'done':
-            print("da done")
             done = True
         elif msg['type'] == 'deanon':
 
-            #TASK VERIFY ALL PAPERWORK
+            # TASK VERIFY ALL legal (msg['data']['legal'])
 
-            deanon_msg_1 = msg['data']
+            deanon_msg_1 = msg['data']['deanon_str']
 
+            #decrypt the deanon string
             y_hat = da.deanon(deanon_msg_1, pk_da, sk_da)
+            
+            #send decrypted deanon string to law enfocement
             le_queue.put(json.dumps(y_hat))
         else:
             print("invalid message type")
+    
+
+    print("da done")
 
 def le_demo(le_queue, idp_queue, ca_queue, da_queue):   
+    # wait for all users to send their certificate_id
+    # note users don't necessarily finish in order so le_queue is not sorted (perp_index != threadno)
     while le_queue.qsize() < NUM_USERS:
         time.sleep(1)
+    print("users done")
 
+    # choose a random element of the list of certificates to be flagged as NCP
     perp_index = secrets.randbelow(NUM_USERS)
 
+    #set certificate_id = le_queue[perp_index] then clear le_queue
     certificate_id = le_queue.get()
 
     for i in range(perp_index):
@@ -291,54 +304,85 @@ def le_demo(le_queue, idp_queue, ca_queue, da_queue):
     
     while not le_queue.empty():
         le_queue.get()
+    
+    #send legal evidence and certificate ID to CA
+    legal = "this string contains evidence of NCP posted by user w/ certificate_id = {}".format(certificate_id)
 
     ca_msg = {
         'type' : 'deanon',
-        'data' : certificate_id
+        'data' : {
+            'cert_id':certificate_id,
+            'legal': legal
+        }
     }
+
     ca_queue.put(json.dumps(ca_msg))
 
-    while le_queue.empty():
-        time.sleep(1)
+    # wait for CA to send deanon_string
     deanon_str = json.loads(le_queue.get())
 
-    #kill CA
-    ca_queue.put(json.dumps('done'))
+    if deanon_str == "":
+        print("CA failed to find certificate with certificate_id")
+        #kill all processes
+        idp_queue.put(json.dumps('done'))
+        ca_queue.put(json.dumps('done'))
+        da_queue.put(json.dumps('done'))
+        return -1
 
+    #send DA deanon_str from CA
     da_msg = {
         'type' : 'deanon',
-        'data' : deanon_str
+        'data' : {
+            'deanon_str':deanon_str,
+            'legal':legal
+        }
     }
 
     da_queue.put(json.dumps(da_msg))
 
-    while le_queue.empty():
-        time.sleep(1)
+    #wait for DA to return decrypted deanonymization string
     y_hat = json.loads(le_queue.get())
 
-    #kill da
-    da_queue.put(json.dumps('done'))
-    
     if y_hat < 1:
-        print("deanon failed, invalid deanon string")
-    else:
-        idp_msg = {
-            'type' : 'deanon',
-            'data' : y_hat
+        print("DA failed to decrypt deanon string (invalid deanon_str)")
+        #kill all processes
+        idp_queue.put(json.dumps('done'))
+        ca_queue.put(json.dumps('done'))
+        da_queue.put(json.dumps('done'))
+        return -1
+
+
+    #send idp decrypted deanon string and evidence
+    idp_msg = {
+        'type' : 'deanon',
+        'data' : { 
+            'y_hat' : y_hat,
+            'legal' : legal
         }
-        idp_queue.put(json.dumps(idp_msg))
+    }
 
-        while le_queue.empty():
-            time.sleep(1)
-        user_id = json.loads(le_queue.get())
+    idp_queue.put(json.dumps(idp_msg))
 
-        print("perp_id: ", user_id)
+    #wait for IDP to return identifying information
+    while le_queue.empty():
+        time.sleep(1)
+    user_id = json.loads(le_queue.get())
 
-    #KILL idp
+    if user_id == -1:
+        print("idp unable to find user with y_u = {} in its database".format(y_hat))
+    else:
+        print("user identified: ", user_id)
+
+    #kill other processes
     idp_queue.put(json.dumps('done'))
+    ca_queue.put(json.dumps('done'))
+    da_queue.put(json.dumps('done'))
+
+
+    print("le done")
 
 def main():
-    #if we dont clear the keys then user/ca read old keys and everything breaks
+    # if we dont clear the keys then user/ca read old keys and everything breaks
     constants.clear_keys()
 
     # queues for each process to receive messages
@@ -361,7 +405,6 @@ def main():
 
     for i in range(NUM_USERS):
         user_threads[i].start()
-    #user_thread.start()
     idp_thread.start()
     ca_thread.start()
     da_thread.start()
