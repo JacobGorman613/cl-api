@@ -115,9 +115,9 @@ def nym_gen_3(ng1_out, nym_gen_msg_2, keys):
     }
 
     C = {
-        'C_1' : C_1,
-        'C_2' : C_2,
-        'C_3' : C_3
+        'C_1':C_1,
+        'C_2':C_2,
+        'C_3':C_3
     }
 
     # part of primary credential shared with IDP
@@ -143,9 +143,7 @@ def nym_gen_3(ng1_out, nym_gen_msg_2, keys):
 
     data = {
         'pub':pub,
-        'R':R,
-        'C':C,
-        's_tilde':s_tilde,
+        'C_3':C_3,
         'zkp_ng2':zkp_ng2,
         'zkp_ng3':zkp_ng3,
         'id' : ng1_out['send']['data']['id']

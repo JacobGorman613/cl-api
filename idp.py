@@ -47,7 +47,7 @@ def nym_gen_4(nym_gen_msg_3, buffer, pk_idp, pk_da):
 
     C_1 = nym_gen_msg_1['pub']['C_1']
     C_2 = nym_gen_msg_1['pub']['C_2']
-    C_3 = nym_gen_msg_3['C']['C_3']
+    C_3 = nym_gen_msg_3['C_3']
 
     zkp_ng2 = nym_gen_msg_3['zkp_ng2']
     zkp_ng3 = nym_gen_msg_3['zkp_ng3']

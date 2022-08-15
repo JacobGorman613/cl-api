@@ -183,6 +183,7 @@ def idp_demo(idp_queue, user_queues, le_queue):
                 key = out['store']['key']
                 cred_type = out['store']['cred_type']
                 value = out['store']['value']
+                #TASK replace with replace database storage
                 idp_db[cred_type][key] = value
 
     print("idp done")
