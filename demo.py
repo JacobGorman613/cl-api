@@ -38,11 +38,7 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
     #note each protocol (nym gen, cred gen, cred vf) have their own session id
     session_id_nym_gen = threadno
 
-    msg_init = {
-        'type':'vf_id',
-        'id_u':id_u,
-        'id':session_id_nym_gen
-    }
+    msg_init = user.get_init_msg(id_u, session_id_nym_gen)
 
     idp_queue.put(json.dumps(msg_init))
 
@@ -109,7 +105,7 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
     ca_queue.put(json.dumps('done'))
 
     #send LE our certificate ID for when they choose a random user to flag
-    le_queue.put(certificate['cert_id'])
+    le_queue.put(json.dumps(certificate))
 
 
 def idp_demo(idp_queue, user_queues, le_queue):
@@ -122,7 +118,7 @@ def idp_demo(idp_queue, user_queues, le_queue):
     keys = idp.init_keys_dict(pk_idp, sk_idp, pk_da)
 
     # represents a cache, dict of dicts
-    idp_buffer = idp.init_idp_buffer()
+    idp_cache = idp.init_idp_cache()
 
 
     # represents persistent data
@@ -163,12 +159,22 @@ def idp_demo(idp_queue, user_queues, le_queue):
 
             le_queue.put(json.dumps(perp_id))
         else:
-            out = idp.schedule_idp(msg, idp_buffer, keys)
+            out = idp.schedule_idp(msg, idp_cache, keys)
+            if 'verify' in out:
+                #TASK verify id is good can get id_u as out['id_u'] or msg['id_u']
+                id_verified = True
+
+                if not id_verified:
+                    print("failed to verify identity")
+                    out['send'] = 'failure'
+                else:
+                    idp.store_uid(msg, idp_cache)
+                    out['send'] = 'success'
             if 'load' in out:
                 key = out['load']
                 load_type = out['load_type']
                 if key in idp_db[load_type]:
-                    out = idp.schedule_idp(msg, idp_buffer, keys, idp_db[load_type][key])
+                    out = idp.schedule_idp(msg, idp_cache, keys, idp_db[load_type][key])
                 else:
                     # TODO real error handling
                     print ("failed to find {} in database".format(key))
@@ -203,7 +209,6 @@ def ca_demo(ca_queue, user_queues, le_queue):
 
     # loop until all users and le have sent 'done' messages
     while not done:
-
         msg = json.loads(ca_queue.get())
 
         if msg == 'done':
@@ -214,7 +219,7 @@ def ca_demo(ca_queue, user_queues, le_queue):
         elif msg['type'] == 'deanon':
             # DEANON HANDLED SEPARATELY FROM MAIN CASE FOR CONTROL FLOW REASONS AND BECAUSE ACTUAL PROCESS OUTSIDE API
             # TASK: verify all legal paperwork (msg['data']['legal'])
-            certificate_id = msg['data']['cert_id']
+            certificate_id = msg['data']['cert']['cert_id']
             deanon_str = ""
             try:
                 deanon_str = ca_db[certificate_id]['deanon_str']
@@ -232,12 +237,16 @@ def ca_demo(ca_queue, user_queues, le_queue):
                 # TASK get a certificate and cert_id
 
                 certificate = {
-                    'cert' : secrets.randbits(64),
-                    'cert_id' : secrets.randbits(64),
+                    #should be replaced with real certificate and real cert_id but for now use session_id as cert_id
+                    #we really don't even need a session id for CA, maybe removed in later version (all done one back/forth transaction)
+                    #(include hash of msg id so that it is unique)
+                    'cert' : "this is a certificate that I verified my subcredential with the CA" + str(constants.hash_str(msg['id'])),
+                    'cert_id' : msg['id'],
                     'proof_of_validity' : out['cert']
                 }
 
                 #additional call to schedule_ca to configure out to be good for 'send' and 'store'
+                #note the addition of the optional data parameter
                 out = ca.schedule_ca(msg, keys, certificate)
 
             # if out has a send parameter send out['send'] to out['send_id']
@@ -298,21 +307,23 @@ def le_demo(le_queue, idp_queue, ca_queue, da_queue):
     perp_index = secrets.randbelow(NUM_USERS)
 
     #set certificate_id = le_queue[perp_index] then clear le_queue
-    certificate_id = le_queue.get()
+    certificate = json.loads(le_queue.get())
 
     for i in range(perp_index):
-        certificate_id = le_queue.get()
+        certificate = json.loads(le_queue.get())
     
     while not le_queue.empty():
         le_queue.get()
     
+    print("LE found NCP posted, certificate had id {}".format(certificate['cert_id']))
+
     #send legal evidence and certificate ID to CA
-    legal = "this string contains evidence of NCP posted by user w/ certificate_id = {}".format(certificate_id)
+    legal = "this string contains evidence of NCP posted by user w/ certificate_id = {}".format(certificate['cert_id'])
 
     ca_msg = {
         'type' : 'deanon',
         'data' : {
-            'cert_id':certificate_id,
+            'cert' : certificate,
             'legal': legal
         }
     }
@@ -365,8 +376,6 @@ def le_demo(le_queue, idp_queue, ca_queue, da_queue):
     idp_queue.put(json.dumps(idp_msg))
 
     #wait for IDP to return identifying information
-    while le_queue.empty():
-        time.sleep(1)
     user_id = json.loads(le_queue.get())
 
     if user_id == -1:

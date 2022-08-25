@@ -271,3 +271,11 @@ def init_keys_dict(x_u, pk_idp, pk_da):
         'pk_idp' : pk_idp,
         'pk_da' : pk_da
     }
+
+
+def get_init_msg(id_u, session_id):
+    return {
+        'type':'vf_id',
+        'id_u':id_u,
+        'id':session_id
+    }

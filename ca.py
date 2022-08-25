@@ -27,11 +27,11 @@ def schedule_ca(msg, keys, data = None):
             else:
                 return {
                     'send' : 'failure',
-                    'id' : msg['id']
+                    'send_id' : msg['id']
                 }
         else:
             #Potential here if API is misused to skip a PoK. maybe we want to run it again?
-                        
+
             out = {
                 #send certificate and cert_id to user (prob not cert_id but necessary for the demo)
                 'send' : data,

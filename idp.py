@@ -8,9 +8,9 @@ import json
 import time
 
 # returns next message to send or empty dict if zkp fails
-def nym_gen_2(nym_gen_msg_1, buffer, pk_idp):
-    ng1_datas = buffer['ng1_datas']
-    ng2_datas = buffer['ng2_datas']
+def nym_gen_2(nym_gen_msg_1, cache, pk_idp):
+    ng1_datas = cache['ng1_datas']
+    ng2_datas = cache['ng2_datas']
     if not zkp.verify_zkp_nym_gen_1(nym_gen_msg_1, pk_idp):
         return {}
     r = constants.rand_in_range(constants.ELL_DELTA)
@@ -27,11 +27,11 @@ def nym_gen_2(nym_gen_msg_1, buffer, pk_idp):
 
     return ng2_out
 
-def nym_gen_4(nym_gen_msg_3, buffer, pk_idp, pk_da):
+def nym_gen_4(nym_gen_msg_3, cache, pk_idp, pk_da):
     session_id = nym_gen_msg_3['id']
 
-    nym_gen_msg_1 = buffer['ng1_datas'][session_id][0]
-    nym_gen_msg_2 = buffer['ng2_datas'][session_id][0]
+    nym_gen_msg_1 = cache['ng1_datas'][session_id][0]
+    nym_gen_msg_2 = cache['ng2_datas'][session_id][0]
 
     primary_cred_pub = nym_gen_msg_3['pub']
 
@@ -52,13 +52,13 @@ def nym_gen_4(nym_gen_msg_3, buffer, pk_idp, pk_da):
     zkp_ng2 = nym_gen_msg_3['zkp_ng2']
     zkp_ng3 = nym_gen_msg_3['zkp_ng3']
 
-    vf_ng2 = zkp.verify_zkp_nym_gen_2(primary_cred_pub, C_1, C_2, C_3 , r, pk_idp, zkp_ng2)
+    vf_ng2 = zkp.verify_zkp_nym_gen_2(primary_cred_pub, C_1, C_2, C_3, r, pk_idp, zkp_ng2)
     vf_ng3 = zkp.verify_zkp_nym_gen_3(primary_cred_pub, pk_idp, pk_da, zkp_ng3)
     
 
     #if ZKPs succeed store primary_cred
     if vf_ng2 and vf_ng3:
-        primary_cred_pub['id'] = buffer['user_ids'][session_id][0]
+        primary_cred_pub['id'] = cache['user_ids'][session_id][0]
         out = {
             'send' : 'success',
             'send_id' : session_id,
@@ -80,7 +80,7 @@ def nym_gen_4(nym_gen_msg_3, buffer, pk_idp, pk_da):
 #cred_gen
 
 
-def cred_gen_2(msg, buffer, pk_idp, sk_idp): #cred_gen_msg_1, sub_creds, pk_idp, sk_idp):
+def cred_gen_2(msg, cache, pk_idp, sk_idp): #cred_gen_msg_1, sub_creds, pk_idp, sk_idp):
     if not zkp.verify_zkp_cred_gen_1(msg['data'], pk_idp):
         return {}
 
@@ -119,7 +119,7 @@ def cred_gen_2(msg, buffer, pk_idp, sk_idp): #cred_gen_msg_1, sub_creds, pk_idp,
     return out
 
 
-def schedule_idp(msg, buffer, keys, data = None):
+def schedule_idp(msg, cache, keys, data = None):
     msg_type = msg['type']
 
     pk_idp = keys['pk_idp']
@@ -127,29 +127,14 @@ def schedule_idp(msg, buffer, keys, data = None):
     pk_da = keys['pk_da']
 
     if msg_type == 'vf_id':
-        #TASK verify id is good
-        id_verified = True
-
-
-        if id_verified:
-            #TODO store everything in buffer
-            out = {
-                'send' : 'success',
-                'send_id' : msg['id']
-            }
-            #TIME REFACTOR
-            buffer['user_ids'][msg['id']] = (msg['id_u'], time.time())
-            #buffer['user_ids'][msg['id']] = msg['id_u']
-            return out
-        else:
-            #TODO error code for failure to identify
-            return {
-                'send' : 'failure',
-                'send_id' : msg['id']
-            }
+        return {
+            'verify' : msg['id_u'],
+            'send' : '',
+            'send_id' : msg['id']
+        }
     elif msg_type == 'ng1':
 
-        ng2_out = nym_gen_2(msg['data'], buffer, pk_idp)
+        ng2_out = nym_gen_2(msg['data'], cache, pk_idp)
 
         #TODO add appropriate behavior
         if len(ng2_out) == 0:
@@ -169,8 +154,8 @@ def schedule_idp(msg, buffer, keys, data = None):
 
         #have to add extra checks to make sure we got valid parameters from other person
         #checks second and third proofs of knowledge
-        #ng4 checks if 2 PoKs from msg and updates buffer (sometimes instructions to store)
-        return nym_gen_4(msg['data'], buffer, pk_idp, pk_da)
+        #ng4 checks if 2 PoKs from msg and updates cache (sometimes instructions to store)
+        return nym_gen_4(msg['data'], cache, pk_idp, pk_da)
 
         #CRED GEN (wait for user to initiate)
     elif msg_type == 'cg1':
@@ -183,31 +168,31 @@ def schedule_idp(msg, buffer, keys, data = None):
             return out
         else:
             #sub_cred == cg2_out
-            return cred_gen_2(msg, buffer, pk_idp, sk_idp)
+            return cred_gen_2(msg, cache, pk_idp, sk_idp)
     else:
         #TODO put real error handling here
         print("Invalid message type")
 
-def init_idp_buffer():
+def init_idp_cache():
     return {
         'ng1_datas' : {},
         'ng2_datas' : {},
         'user_ids' : {}
     }
 
-#deletes all entrys in idp_buffer that were put there more than 'age' seconds ago
-def clean_idp_buffer(idp_buffer, age):
+#deletes all entrys in idp_cache that were put there more than 'age' seconds ago
+def clean_idp_cache(idp_cache, age):
     curr_time = time.time()
     print()
     print(curr_time)
     print()
     deleted_items = {}
-    for sub_dict_key in list(idp_buffer.keys()):
+    for sub_dict_key in list(idp_cache.keys()):
         deleted_items[sub_dict_key] = {}
-        for key in list(idp_buffer[sub_dict_key].keys()):
-            if curr_time - idp_buffer[sub_dict_key][key][1] > age:
-                #del idp_buffer[sub_dict_key][key]
-                deleted_items[sub_dict_key][key] = idp_buffer[sub_dict_key].pop(key)
+        for key in list(idp_cache[sub_dict_key].keys()):
+            if curr_time - idp_cache[sub_dict_key][key][1] > age:
+                #del idp_cache[sub_dict_key][key]
+                deleted_items[sub_dict_key][key] = idp_cache[sub_dict_key].pop(key)
 
     return deleted_items
 
@@ -217,3 +202,6 @@ def init_keys_dict(pk_idp, sk_idp, pk_da):
         'sk_idp': sk_idp,
         'pk_da': pk_da
     }
+
+def store_uid(msg, cache):
+    cache['user_ids'][msg['id']] = (msg['id_u'], time.time())
