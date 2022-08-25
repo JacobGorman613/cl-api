@@ -2,6 +2,8 @@ DESCRIPTION:
     This API implements deanonymizable credentials as described by Camenisch and Lysyanskaya. Manual usage is supported
     but it is recommended to use the ca and idp schedulers to implement the CA and IDP as described in our diagrams.
 TODO:
+    - Main Functionality!
+        - add store id_u
     - Usability
         - do deanon messages need a session id?
         - replace [] with .get() so we can do error handling?

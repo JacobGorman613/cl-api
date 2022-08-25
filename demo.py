@@ -63,6 +63,7 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
 
     nym_response = json.loads(user_queue.get())
 
+    #not in digram yet
     if nym_response != 'success':
         print("failed to obtain primary credential")
     
@@ -111,7 +112,9 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
 def idp_demo(idp_queue, user_queues, le_queue):
     # initialize/import all necessary keys
     (pk_idp, sk_idp) = constants.init_idp_key()
+    #TASK publish in real life not a json file on disk
     constants.publish_pk_idp(pk_idp)
+    #TASK actually import the DA keys
     pk_da = constants.import_pk_da()
 
     # store keys as a single dict since certain calls need different keys
@@ -119,7 +122,6 @@ def idp_demo(idp_queue, user_queues, le_queue):
 
     # represents a cache, dict of dicts
     idp_cache = idp.init_idp_cache()
-
 
     # represents persistent data
     # store one table with primary creds,
@@ -146,8 +148,11 @@ def idp_demo(idp_queue, user_queues, le_queue):
                 done = True
         elif msg['type'] == 'deanon':
             # DEANON HANDLED SEPARATELY SINCE INFREQUENT AND HIGHLY IMPORTANT
-            # TASK verify all legal stuff (msg['data']['legal'])
 
+            # TASK verify all legal stuff (msg['data']['legal'])
+            # msg['data']['legal']) contains all legal evidence/paperwork
+
+            #read y_hat from message
             y_hat = msg['data']['y_hat']
             perp_id = -1
 
@@ -161,7 +166,7 @@ def idp_demo(idp_queue, user_queues, le_queue):
         else:
             out = idp.schedule_idp(msg, idp_cache, keys)
             if 'verify' in out:
-                #TASK verify id is good can get id_u as out['id_u'] or msg['id_u']
+                #TASK verify id is good can get id_u as out['verify']
                 id_verified = True
 
                 if not id_verified:
@@ -174,7 +179,8 @@ def idp_demo(idp_queue, user_queues, le_queue):
                 key = out['load']
                 load_type = out['load_type']
                 if key in idp_db[load_type]:
-                    out = idp.schedule_idp(msg, idp_cache, keys, idp_db[load_type][key])
+                    data = idp_db[load_type][key]
+                    out = idp.schedule_idp(msg, idp_cache, keys, data)
                 else:
                     # TODO real error handling
                     print ("failed to find {} in database".format(key))
@@ -183,6 +189,7 @@ def idp_demo(idp_queue, user_queues, le_queue):
                 # array of queues is how demo keeps track of which user we are responding to
 
                 # send result to user with correct id
+                # send out['send'] to out['send_id']
                 user_queues[out['send_id'] % NUM_USERS].put(json.dumps(out['send']))
 
             if 'store' in out:
