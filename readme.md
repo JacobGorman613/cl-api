@@ -1,9 +1,9 @@
 # USAGE:
     - Dependencies (this is what I had to do to get the package to work on a fresh build of Ubuntu 20.05)
-        - python3
+        - Python 3.8 is required (specifically for negative powers modulo n to be supported in pow(a,b,n))
         - pip3 (sudo apt install python3-pip) (for installation of other dependencies)
         - pycrypto (pip3 install pycrypto)
-            - on Unix based systems with Python 3.8 or later you get an error message with cause
+            - on Unix based systems with Python 3.8 or later you may get an error message with cause
             - File ".../python3.8/site-packages/Crypto/Random/_UserFriendlyRNG.py", line 77, in collect t = time.clock()
             - need to change this time.clock() to time.time() in _UserFriendlyRNG.py if you are on a Unix based system
             - I need to find a better isprime method but this is the best fix for now (other packages broke a lot so I will try to fix this later)

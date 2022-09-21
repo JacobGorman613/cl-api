@@ -306,21 +306,24 @@ def da_demo(da_queue, le_queue):
 def le_demo(le_queue, idp_queue, ca_queue, da_queue):   
     # wait for all users to send their certificate_id
     # note users don't necessarily finish in order so le_queue is not sorted (perp_index != threadno)
-    while le_queue.qsize() < NUM_USERS:
-        time.sleep(1)
-    print("users done")
+
 
     # choose a random element of the list of certificates to be flagged as NCP
     perp_index = secrets.randbelow(NUM_USERS)
 
-    #set certificate_id = le_queue[perp_index] then clear le_queue
     certificate = json.loads(le_queue.get())
 
-    for i in range(perp_index):
-        certificate = json.loads(le_queue.get())
-    
-    while not le_queue.empty():
-        le_queue.get()
+    users_popped = 1
+
+    #set certificate_id = le_queue[perp_index] then clear le_queue
+    while users_popped < NUM_USERS:
+        if (users_popped <= perp_index):
+            certificate = json.loads(le_queue.get())
+        else:
+            le_queue.get()
+        users_popped += 1
+
+    print("users done")
     
     print("LE found NCP posted, certificate had id {}".format(certificate['cert_id']))
 
