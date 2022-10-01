@@ -1,4 +1,5 @@
 NUM_USERS = 10
+NEW_KEYS = True
 
 import da
 import ca
@@ -17,6 +18,11 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
 
     # initialize/import all necessary keys
     x_u = constants.init_user_key()
+
+    #if we are generating new keys wait for DA and IDP to send 'keygen complete' messages before importing
+    if NEW_KEYS:
+        user_queue.get()
+        user_queue.get()
     pk_idp = constants.import_pk_idp()
     pk_da = constants.import_pk_da()
 
@@ -109,11 +115,24 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
     le_queue.put(json.dumps(certificate))
 
 
-def idp_demo(idp_queue, user_queues, le_queue):
+def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
     # initialize/import all necessary keys
-    (pk_idp, sk_idp) = constants.init_idp_key()
-    #TASK publish in real life not a json file on disk
-    constants.publish_pk_idp(pk_idp)
+    if NEW_KEYS:
+        #TASK publish in real life not a json file on disk
+        (pk_idp, sk_idp) = constants.init_idp_key()
+        constants.publish_pk_idp(pk_idp)
+        constants.publish_sk_idp(sk_idp)
+        #let other parties (who need pk_idp) know that it has been generated
+        for user_queue in user_queues:
+            user_queue.put('keygen complete')
+        ca_queue.put('keygen complete')
+
+        #wait for DA to send 'keygen complete'
+        idp_queue.get()
+    else:
+        pk_idp = constants.import_pk_idp()
+        sk_idp = constants.import_sk_idp()
+
     #TASK actually import the DA keys
     pk_da = constants.import_pk_da()
 
@@ -203,6 +222,10 @@ def idp_demo(idp_queue, user_queues, le_queue):
 
 
 def ca_demo(ca_queue, user_queues, le_queue):
+    #if we are generating new keys wait for IDP and DA to send 'keygen complete' before importing
+    if NEW_KEYS:
+        ca_queue.get()
+        ca_queue.get()
     pk_idp = constants.import_pk_idp()
     pk_da = constants.import_pk_da()
 
@@ -266,10 +289,21 @@ def ca_demo(ca_queue, user_queues, le_queue):
     print("ca done")
             
     
-def da_demo(da_queue, le_queue):
+def da_demo(da_queue, user_queues, idp_queue, ca_queue, le_queue):
     # initialize and publish keys
-    (pk_da, sk_da) = constants.init_da_key()
-    constants.publish_pk_da(pk_da)
+    if NEW_KEYS:
+        (pk_da, sk_da) = constants.init_da_key()
+        constants.publish_pk_da(pk_da)
+        constants.publish_sk_da(sk_da)
+
+        #let everyone know keys have been updated
+        for user_queue in user_queues:
+            user_queue.put('keygen complete')
+        idp_queue.put('keygen complete')
+        ca_queue.put('keygen complete')
+    else:
+        pk_da = constants.import_pk_da()
+        sk_da = constants.import_sk_da()
 
     done = False
 
@@ -397,9 +431,6 @@ def le_demo(le_queue, idp_queue, ca_queue, da_queue):
     print("le done")
 
 def main():
-    # if we dont clear the keys then user/ca read old keys and everything breaks
-    constants.clear_keys()
-    time.sleep(10)
     # queues for each process to receive messages
     # note queues are threadsafe
     idp_queue = Queue()
@@ -413,9 +444,9 @@ def main():
         user_queues.append(Queue())
         user_threads.append(Thread(target = user_demo, args = (user_queues[i], idp_queue, ca_queue, le_queue, i, )))
 
-    idp_thread = Thread(target = idp_demo, args = (idp_queue, user_queues, le_queue, ))
+    idp_thread = Thread(target = idp_demo, args = (idp_queue, user_queues, ca_queue, le_queue, ))
     ca_thread = Thread(target = ca_demo, args = (ca_queue, user_queues, le_queue, ))
-    da_thread = Thread(target = da_demo, args = (da_queue, le_queue, ))
+    da_thread = Thread(target = da_demo, args = (da_queue, user_queues, idp_queue, ca_queue, le_queue, ))
     le_thread = Thread(target = le_demo, args = (le_queue, idp_queue, ca_queue, da_queue, ))
 
     for i in range(NUM_USERS):

@@ -16,12 +16,12 @@
 # TODO:
     - Main Functionality!
         - add store id_u // this happens somewhere
-        - race condition on reading/writing keys
     - Decision Points
         - should we move vf_id to same step as nym_gen_1?
     - Usability
         - do deanon messages need a session id?
         - replace [] with .get() so we can do error handling?
+        - move all the methods in constants that are used in the demo only
     - Documentation
         - improve the last diagram in diagrams
             - it was rushed to finish before a meeting and is highly informal   
