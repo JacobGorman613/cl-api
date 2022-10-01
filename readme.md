@@ -32,3 +32,5 @@
         - add range constraints to zkp
         - find correct values for constants
         - s_u bug
+    - Security
+        - After parseing msg['type'] delete all fields from msg that wouldn't be present in that type (write now we only check that the ones that should be there are correct)

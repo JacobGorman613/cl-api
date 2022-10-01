@@ -233,40 +233,35 @@ def ca_demo(ca_queue, user_queues, le_queue):
             except KeyError:
                 continue    
             le_queue.put(json.dumps(deanon_str))
-        else:
-            # if not a deanon message or done message, call the scheduler
-            out = ca.schedule_ca(msg, keys)
+        #if we go under the assumption that the DA doesn't send normal server requests then we 
+        elif msg['type'] == 'vc1':
+            # if the user's subcredential is validated
+            if ca.verify_cred_2(msg['data'], keys):
 
-            # use the output of the scheduler to decide what to do
-
-            # if 'cert' in out then we have verified users subcredential and need to send them a certificate
-            if 'cert' in out:
-                # TASK get a certificate and cert_id
+                # TASK replace with actual certificate generation
+                # currently use session_id as cert_id for ease of debugging
+                # even though CA only does single call and response, session_ids make sense since irl the CA would probably be doing
+                #   additional computation while waiting on things from database/certificate generation etc
+                # (include hash of msg id so that it is unique)
 
                 certificate = {
-                    #should be replaced with real certificate and real cert_id but for now use session_id as cert_id
-                    #we really don't even need a session id for CA, maybe removed in later version (all done one back/forth transaction)
-                    #(include hash of msg id so that it is unique)
                     'cert' : "this is a certificate that I verified my subcredential with the CA" + str(constants.hash_str(msg['id'])),
-                    'cert_id' : msg['id'],
-                    'proof_of_validity' : out['cert']
+                    'cert_id' : msg['id']
                 }
 
-                #additional call to schedule_ca to configure out to be good for 'send' and 'store'
-                #note the addition of the optional data parameter
-                out = ca.schedule_ca(msg, keys, certificate)
+                # TASK choose correct user to send certificate to based on out['send_id']
+                #(reminder that msg_id % NUM_USERS = threadno)
+                user_queues[msg['id'] % NUM_USERS].put(json.dumps(certificate))
 
-            # if out has a send parameter send out['send'] to out['send_id']
-            if 'send' in out:
-                # TASK choose correct connection based on out['send_id']
-                user_queues[out['send_id'] % NUM_USERS].put(json.dumps(out['send']))
+                # TASK replace with actual database storage 
+                ca_db[certificate['cert_id']] = msg['data']
+                # the message contains the deanon_str and proof_of_validity
+            else:
+                user_queues[msg['id'] % NUM_USERS].put(json.dumps('failure'))
 
-            # if out has a 'store' parameter, store in our database
-            if 'store' in out:
-                key = out['store']['key']
-                value = out['store']['value']
-                #TASK replace this with real database access
-                ca_db[key] = value
+        else:
+            #TODO put real error handling here
+            print("Invalid message type")
     
     print("ca done")
             
