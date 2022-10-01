@@ -404,7 +404,7 @@ def le_demo(le_queue, idp_queue, ca_queue, da_queue):
 def main():
     # if we dont clear the keys then user/ca read old keys and everything breaks
     constants.clear_keys()
-
+    time.sleep(10)
     # queues for each process to receive messages
     # note queues are threadsafe
     idp_queue = Queue()

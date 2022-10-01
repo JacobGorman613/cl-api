@@ -16,6 +16,7 @@
 # TODO:
     - Main Functionality!
         - add store id_u // this happens somewhere
+        - race condition on reading/writing keys
     - Decision Points
         - should we move vf_id to same step as nym_gen_1?
     - Usability
