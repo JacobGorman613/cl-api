@@ -80,11 +80,11 @@ def nym_gen_4(nym_gen_msg_3, cache, pk_idp, pk_da):
 #cred_gen
 
 
-def cred_gen_2(msg, cache, pk_idp, sk_idp): #cred_gen_msg_1, sub_creds, pk_idp, sk_idp):
-    if not zkp.verify_zkp_cred_gen_1(msg['data'], pk_idp):
+def cred_gen_2(msg, primary_cred, pk_idp, sk_idp): #cred_gen_msg_1, sub_creds, pk_idp, sk_idp):
+    if not zkp.verify_zkp_cred_gen_1(msg['data'], primary_cred, pk_idp):
         return {}
 
-    p_u = msg['data']['pub']['p_u']
+    p_u = primary_cred['p_u']
 
     d = pk_idp['d']
     n = pk_idp['n']
@@ -158,7 +158,7 @@ def schedule_idp(msg, cache, keys, data = None):
             return out
         else:
             #cg2_out = sub_cred
-            cg2_out = cred_gen_2(msg, cache, pk_idp, sk_idp)
+            cg2_out = cred_gen_2(msg, data, pk_idp, sk_idp)
             
             if len(cg2_out) == 0:
                 print ("zkp_cg1 failed")
@@ -207,6 +207,3 @@ def init_keys_dict(pk_idp, sk_idp, pk_da):
         'sk_idp': sk_idp,
         'pk_da': pk_da
     }
-
-def store_uid(msg, cache):
-    cache['user_ids'][msg['id']] = (msg['id_u'], time.time())

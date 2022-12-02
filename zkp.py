@@ -203,8 +203,8 @@ def reparam_verify_zkp_cred_gen_1(y_1, g_1, g_2, g_3, n, zkp_cg1):
 
     return True
 
-def verify_zkp_cred_gen_1(cred_gen_msg_1, pk_idp):
-    p_u = cred_gen_msg_1['pub']['p_u']
+def verify_zkp_cred_gen_1(cred_gen_msg_1, primary_cred, pk_idp):
+    p_u = primary_cred['p_u']
     zkp_cg1 = cred_gen_msg_1['zkp_cg1']
 
     n = pk_idp['n']

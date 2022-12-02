@@ -193,7 +193,7 @@ def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
                     print("failed to verify identity")
                     out['send'] = 'failure'
                 else:
-                    idp.store_uid(msg, idp_cache)
+                    idp_cache['user_ids'][msg['id']] = (msg['id_u'], time.time())
                     out['send'] = 'success'
             if 'load' in out:
                 key = out['load']
