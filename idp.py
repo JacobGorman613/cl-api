@@ -105,18 +105,8 @@ def cred_gen_2(msg, cache, pk_idp, sk_idp): #cred_gen_msg_1, sub_creds, pk_idp, 
         'e_u': e_u,
         'c_u': c_u
     }
-    
-    out = {
-        'send_id':msg['id'],
-        'send' : sub_cred,
-        'store' : {
-            'key' : msg['data']['pub']['nym'],
-            'cred_type' : 'sub_cred',
-            'value': sub_cred
-        }
-    }
 
-    return out
+    return sub_cred
 
 
 def schedule_idp(msg, cache, keys, data = None):
@@ -167,8 +157,23 @@ def schedule_idp(msg, cache, keys, data = None):
             }
             return out
         else:
-            #sub_cred == cg2_out
-            return cred_gen_2(msg, cache, pk_idp, sk_idp)
+            #cg2_out = sub_cred
+            cg2_out = cred_gen_2(msg, cache, pk_idp, sk_idp)
+            
+            if len(cg2_out) == 0:
+                print ("zkp_cg1 failed")
+                return {}
+
+            out = {
+                'send_id':msg['id'],
+                'send' : cg2_out,
+                'store' : {
+                    'key' : msg['data']['pub']['nym'],
+                    'cred_type' : 'sub_cred',
+                    'value': cg2_out
+                }
+            }
+            return out
     else:
         #TODO put real error handling here
         print("Invalid message type")

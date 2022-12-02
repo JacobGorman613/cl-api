@@ -1,11 +1,12 @@
 NUM_USERS = 10
-NEW_KEYS = True
+NEW_KEYS = False
 
 import da
 import ca
 import user
 import idp
 import constants
+import key_storage
 
 import secrets
 import time
@@ -23,8 +24,8 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
     if NEW_KEYS:
         user_queue.get()
         user_queue.get()
-    pk_idp = constants.import_pk_idp()
-    pk_da = constants.import_pk_da()
+    pk_idp = key_storage.import_pk_idp()
+    pk_da = key_storage.import_pk_da()
 
     keys = user.init_keys_dict(x_u, pk_idp, pk_da)
     
@@ -120,8 +121,8 @@ def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
     if NEW_KEYS:
         #TASK publish in real life not a json file on disk
         (pk_idp, sk_idp) = constants.init_idp_key()
-        constants.publish_pk_idp(pk_idp)
-        constants.publish_sk_idp(sk_idp)
+        key_storage.publish_pk_idp(pk_idp)
+        key_storage.publish_sk_idp(sk_idp)
         #let other parties (who need pk_idp) know that it has been generated
         for user_queue in user_queues:
             user_queue.put('keygen complete')
@@ -130,11 +131,11 @@ def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
         #wait for DA to send 'keygen complete'
         idp_queue.get()
     else:
-        pk_idp = constants.import_pk_idp()
-        sk_idp = constants.import_sk_idp()
+        pk_idp = key_storage.import_pk_idp()
+        sk_idp = key_storage.import_sk_idp()
 
     #TASK actually import the DA keys
-    pk_da = constants.import_pk_da()
+    pk_da = key_storage.import_pk_da()
 
     # store keys as a single dict since certain calls need different keys
     keys = idp.init_keys_dict(pk_idp, sk_idp, pk_da)
@@ -226,8 +227,8 @@ def ca_demo(ca_queue, user_queues, le_queue):
     if NEW_KEYS:
         ca_queue.get()
         ca_queue.get()
-    pk_idp = constants.import_pk_idp()
-    pk_da = constants.import_pk_da()
+    pk_idp = key_storage.import_pk_idp()
+    pk_da = key_storage.import_pk_da()
 
     keys = ca.init_keys_dict(pk_idp, pk_da)
 
@@ -293,8 +294,8 @@ def da_demo(da_queue, user_queues, idp_queue, ca_queue, le_queue):
     # initialize and publish keys
     if NEW_KEYS:
         (pk_da, sk_da) = constants.init_da_key()
-        constants.publish_pk_da(pk_da)
-        constants.publish_sk_da(sk_da)
+        key_storage.publish_pk_da(pk_da)
+        key_storage.publish_sk_da(sk_da)
 
         #let everyone know keys have been updated
         for user_queue in user_queues:
@@ -302,8 +303,8 @@ def da_demo(da_queue, user_queues, idp_queue, ca_queue, le_queue):
         idp_queue.put('keygen complete')
         ca_queue.put('keygen complete')
     else:
-        pk_da = constants.import_pk_da()
-        sk_da = constants.import_sk_da()
+        pk_da = key_storage.import_pk_da()
+        sk_da = key_storage.import_sk_da()
 
     done = False
 
@@ -431,6 +432,8 @@ def le_demo(le_queue, idp_queue, ca_queue, da_queue):
     print("le done")
 
 def main():
+    print("running with {} users, NEW_KEYS = {}".format(NUM_USERS, NEW_KEYS))
+
     # queues for each process to receive messages
     # note queues are threadsafe
     idp_queue = Queue()
