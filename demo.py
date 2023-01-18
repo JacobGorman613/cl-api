@@ -1,5 +1,5 @@
 NUM_USERS = 10
-NEW_KEYS = False
+NEW_KEYS = True
 
 import da
 import ca
@@ -28,6 +28,7 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
     pk_da = key_storage.import_pk_da()
 
     keys = user.init_keys_dict(x_u, pk_idp, pk_da)
+    print('Keys initialized')
     
     # this may not be a great assumption to make but assuming for now proof of identity can be encoded as a string
     id_u = "this string contains definitive proof that I am thread " + str(threadno)
@@ -75,6 +76,7 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
         print("failed to obtain primary credential")
     
     # STORE primary_cred
+    print('NYM GEN Done')
     
     # PROTOCOL: CRED_GEN
 
@@ -95,25 +97,26 @@ def user_demo(user_queue, idp_queue, ca_queue, le_queue, threadno):
     # TASK store sub_cred
 
     idp_queue.put(json.dumps('done'))
+    print('User %s done'%(threadno))
     
     # PROTOCOL: VERIFY_CRED
-    session_id_verify_cred = 2 * NUM_USERS + threadno
+    # session_id_verify_cred = 2 * NUM_USERS + threadno
 
-    m = "i agree not to post ncp or you can deanonymize me"
+    # m = "i agree not to post ncp or you can deanonymize me"
 
-    vc1_out = user.verify_cred_1(primary_cred, sub_cred, m, session_id_verify_cred, keys)
+    # vc1_out = user.verify_cred_1(primary_cred, sub_cred, m, session_id_verify_cred, keys)
 
-    ca_queue.put(json.dumps(vc1_out))
+    # ca_queue.put(json.dumps(vc1_out))
 
-    # get certificate or error message
-    certificate = json.loads(user_queue.get())
+    # # get certificate or error message
+    # certificate = json.loads(user_queue.get())
 
-    if certificate == 'failure':
-        print("user thread {} failed to verify subcredential".format(threadno))
-    ca_queue.put(json.dumps('done'))
+    # if certificate == 'failure':
+    #     print("user thread {} failed to verify subcredential".format(threadno))
+    # ca_queue.put(json.dumps('done'))
 
-    #send LE our certificate ID for when they choose a random user to flag
-    le_queue.put(json.dumps(certificate))
+    # #send LE our certificate ID for when they choose a random user to flag
+    # le_queue.put(json.dumps(certificate))
 
 
 def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
@@ -164,7 +167,7 @@ def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
         if msg == 'done':
             num_finished += 1
             # wait for all users and LE to finish
-            if num_finished == NUM_USERS + 1:
+            if num_finished == NUM_USERS:# + 1:
                 done = True
         elif msg['type'] == 'deanon':
             # DEANON HANDLED SEPARATELY SINCE INFREQUENT AND HIGHLY IMPORTANT
@@ -309,26 +312,26 @@ def da_demo(da_queue, user_queues, idp_queue, ca_queue, le_queue):
     done = False
 
     # loop until LE sends done
-    while not done:
-        msg = json.loads(da_queue.get())
+    # while not done:
+    #     msg = json.loads(da_queue.get())
 
-        # templating is dumb here but works
-        #in a real demo deanon is the only kind of message da should be getting
-        if msg == 'done':
-            done = True
-        elif msg['type'] == 'deanon':
+    #     # templating is dumb here but works
+    #     #in a real demo deanon is the only kind of message da should be getting
+    #     if msg == 'done':
+    #         done = True
+    #     elif msg['type'] == 'deanon':
 
-            # TASK VERIFY ALL legal (msg['data']['legal'])
+    #         # TASK VERIFY ALL legal (msg['data']['legal'])
 
-            deanon_msg_1 = msg['data']['deanon_str']
+    #         deanon_msg_1 = msg['data']['deanon_str']
 
-            #decrypt the deanon string
-            y_hat = da.deanon(deanon_msg_1, pk_da, sk_da)
+    #         #decrypt the deanon string
+    #         y_hat = da.deanon(deanon_msg_1, pk_da, sk_da)
             
-            #send decrypted deanon string to law enfocement
-            le_queue.put(json.dumps(y_hat))
-        else:
-            print("invalid message type")
+    #         #send decrypted deanon string to law enfocement
+    #         le_queue.put(json.dumps(y_hat))
+    #     else:
+    #         print("invalid message type")
     
 
     print("da done")
@@ -455,9 +458,9 @@ def main():
     for i in range(NUM_USERS):
         user_threads[i].start()
     idp_thread.start()
-    ca_thread.start()
+    # ca_thread.start()
     da_thread.start()
-    le_thread.start()
+    # le_thread.start()
 
 if __name__ == "__main__":
     main()
