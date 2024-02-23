@@ -1,10 +1,15 @@
-import constants
 import secrets
-import zkp
+try:
+    import constants
+    import zkp
+    import idpcache
+except:
+    from . import constants
+    from . import zkp
+    from . import idpcache
 
 #nym_gen
 import json
-
 import time
 
 # returns next message to send or empty dict if zkp fails
@@ -24,7 +29,7 @@ def nym_gen_2(nym_gen_msg_1, cache, pk_idp):
     session_id = nym_gen_msg_1['id']
     ng1_datas[session_id] = (nym_gen_msg_1, time.time())
     ng2_datas[session_id] = (ng2_out, time.time())
-
+    idpcache.write_to_cache(cache)
     return ng2_out
 
 def nym_gen_4(nym_gen_msg_3, cache, pk_idp, pk_da):

@@ -1,4 +1,7 @@
-import constants
+try:
+    import constants
+except:
+    from . import constants
 import secrets
 
 #idp - nym gen
