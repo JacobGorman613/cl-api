@@ -79,7 +79,7 @@ def nym_gen_4(nym_gen_msg_3, cache, pk_idp, pk_da):
         #TODO error code for failure to identify
         return {
             'send' : 'failure',
-            'send_id' : msg['id']
+            'send_id' : session_id
         }
 
 #cred_gen

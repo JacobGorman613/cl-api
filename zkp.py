@@ -1,5 +1,5 @@
 try:
-    import constants
+    from . import constants
 except:
     from . import constants
 import secrets
