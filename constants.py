@@ -2,8 +2,8 @@ import secrets
 from Crypto.Util.number import isPrime
 import hashlib
 
-ELL_GAMMA = 128
-ELL_N = 256 #2048
+ELL_GAMMA = 1024
+ELL_N = 2048
 ELL_DELTA = 128
 ELL_LAMBDA = 128
 ELL_K = 128
@@ -50,7 +50,7 @@ def rand_safe_prime(length):
 
 def init_idp_key():
     #bitshift instead of divide by 2 to maintain int typing
-    p = rand_safe_prime(ELL_N >> 1) 
+    p = rand_safe_prime(ELL_N >> 1)
     q = rand_safe_prime(ELL_N >> 1)
 
     n = p * q
