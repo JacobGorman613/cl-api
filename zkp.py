@@ -1,7 +1,7 @@
 try:
     from . import constants
 except:
-    from . import constants
+    import constants
 import secrets
 
 #idp - nym gen
