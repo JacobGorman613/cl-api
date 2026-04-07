@@ -1,4 +1,7 @@
-import constants
+try:
+    from . import constants
+except:
+    import constants
 import secrets
 
 #idp - nym gen
@@ -102,7 +105,7 @@ def reparam_verify_zkp_nym_gen_2(y_1, y_2, y_3, y_4, y_5, g_1, g_2, g_3, g_4, g_
     return True
 
 def verify_zkp_nym_gen_2(primary_cred_pub, C_1, C_2, C_3, r, pk_idp, zkp_ng2):
-    p_u = primary_cred_pub['p_u']
+    p_u = int(primary_cred_pub['p_u'])
 
     n = pk_idp['n']
     
@@ -120,7 +123,7 @@ def verify_zkp_nym_gen_2(primary_cred_pub, C_1, C_2, C_3, r, pk_idp, zkp_ng2):
 
     y_1 = pow(C_1, 2, n)
     y_2 = pow(C_2, 2, n)
-    y_3 = pow(C_3, 2, n)
+    y_3 = pow(int(C_3), 2, n)
     # nested pow can probably be one with a negative exponent but idk if negative powers work in general or just for modular inverse
     y_4 = (y_1 * pow(g_1, (r - (1 << constants.ELL_DELTA) + 1), n)) * pow(pow(y_3, (1 << (constants.ELL_DELTA + 1)) - 1, n), -1, n) % n
     y_5 = pow(p_u, 2, n)
@@ -155,8 +158,8 @@ def reparam_verify_zkp_nym_gen_3(y_1, y_2, g_1, g_2, g_3, h_1, n, p_d, zkp_ng3):
     return True
 
 def verify_zkp_nym_gen_3(primary_cred_pub, pk_idp, pk_da, zkp_ng3):
-    p_u = primary_cred_pub['p_u']
-    y_u = primary_cred_pub['y_u']
+    p_u = int(primary_cred_pub['p_u'])
+    y_u = int(primary_cred_pub['y_u'])
 
     n = pk_idp['n']
     a = pk_idp['a']

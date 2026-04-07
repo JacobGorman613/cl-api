@@ -141,6 +141,8 @@ def init_da_key():
         'h_d': h,
         'p_d': p_d
     }
+    print(type(pk_da))
+    print(type(sk_da))
     return (pk_da, sk_da)
 
 

@@ -1,4 +1,4 @@
-NUM_USERS = 10
+NUM_USERS = 1
 NEW_KEYS = False
 
 import da
@@ -7,6 +7,7 @@ import user
 import idp
 import constants
 import key_storage
+import idpcache
 
 import secrets
 import time
@@ -121,6 +122,7 @@ def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
     if NEW_KEYS:
         #TASK publish in real life not a json file on disk
         (pk_idp, sk_idp) = constants.init_idp_key()
+
         key_storage.publish_pk_idp(pk_idp)
         key_storage.publish_sk_idp(sk_idp)
         #let other parties (who need pk_idp) know that it has been generated
@@ -142,6 +144,8 @@ def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
 
     # represents a cache, dict of dicts
     idp_cache = idp.init_idp_cache()
+    idpcache.set_up_cache() #cachefile code
+    idpcache.write_to_cache(idp_cache) #cachefile code
 
     # represents persistent data
     # store one table with primary creds,
@@ -160,6 +164,7 @@ def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
     while not done:
         # wait until we receive a message
         msg = json.loads(idp_queue.get())
+        #print(f"msg: {msg}\n")
 
         if msg == 'done':
             num_finished += 1
@@ -184,6 +189,7 @@ def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
 
             le_queue.put(json.dumps(perp_id))
         else:
+            #print(f"idp cache: {idp_cache} \n")
             out = idp.schedule_idp(msg, idp_cache, keys)
             if 'verify' in out:
                 #TASK verify id is good can get id_u as out['verify']
@@ -194,12 +200,15 @@ def idp_demo(idp_queue, user_queues, ca_queue, le_queue):
                     out['send'] = 'failure'
                 else:
                     idp_cache['user_ids'][msg['id']] = (msg['id_u'], time.time())
+                    idpcache.write_to_cache(idp_cache) #cachefile code
+                    #print(f"idp cache: {idp_cache}\n")
                     out['send'] = 'success'
             if 'load' in out:
                 key = out['load']
                 load_type = out['load_type']
                 if key in idp_db[load_type]:
                     data = idp_db[load_type][key]
+                    #print(f"idp cache: {idp_cache}\n")
                     out = idp.schedule_idp(msg, idp_cache, keys, data)
                 else:
                     # TODO real error handling

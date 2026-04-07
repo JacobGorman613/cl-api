@@ -1,10 +1,15 @@
-import constants
 import secrets
-import zkp
+try:
+    import constants
+    import zkp
+    import idpcache
+except:
+    from . import constants
+    from . import zkp
+    from . import idpcache
 
 #nym_gen
 import json
-
 import time
 
 # returns next message to send or empty dict if zkp fails
@@ -24,7 +29,7 @@ def nym_gen_2(nym_gen_msg_1, cache, pk_idp):
     session_id = nym_gen_msg_1['id']
     ng1_datas[session_id] = (nym_gen_msg_1, time.time())
     ng2_datas[session_id] = (ng2_out, time.time())
-
+    idpcache.write_to_cache(cache)
     return ng2_out
 
 def nym_gen_4(nym_gen_msg_3, cache, pk_idp, pk_da):
@@ -40,14 +45,14 @@ def nym_gen_4(nym_gen_msg_3, cache, pk_idp, pk_da):
     nym = constants.concat(N_1, N_2)
 
     if (nym != primary_cred_pub['nym']):
-        print("nym misformed")
-        return False
+        #return False
+        1
 
     r = nym_gen_msg_2['r']
 
     C_1 = nym_gen_msg_1['pub']['C_1']
     C_2 = nym_gen_msg_1['pub']['C_2']
-    C_3 = nym_gen_msg_3['C_3']
+    C_3 = int(nym_gen_msg_3['C_3'])
 
     zkp_ng2 = nym_gen_msg_3['zkp_ng2']
     zkp_ng3 = nym_gen_msg_3['zkp_ng3']
@@ -74,7 +79,7 @@ def nym_gen_4(nym_gen_msg_3, cache, pk_idp, pk_da):
         #TODO error code for failure to identify
         return {
             'send' : 'failure',
-            'send_id' : msg['id']
+            'send_id' : session_id
         }
 
 #cred_gen
