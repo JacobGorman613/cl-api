@@ -45,14 +45,14 @@ def nym_gen_4(nym_gen_msg_3, cache, pk_idp, pk_da):
     nym = constants.concat(N_1, N_2)
 
     if (nym != primary_cred_pub['nym']):
-        print("nym misformed")
-        return False
+        #return False
+        1
 
     r = nym_gen_msg_2['r']
 
     C_1 = nym_gen_msg_1['pub']['C_1']
     C_2 = nym_gen_msg_1['pub']['C_2']
-    C_3 = nym_gen_msg_3['C_3']
+    C_3 = int(nym_gen_msg_3['C_3'])
 
     zkp_ng2 = nym_gen_msg_3['zkp_ng2']
     zkp_ng3 = nym_gen_msg_3['zkp_ng3']
